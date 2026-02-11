@@ -183,22 +183,22 @@ export function PostCard({ post }: PostProps) {
     }
 
     return (
-        <article className="border-b border-gray-200 dark:border-gray-800 p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors cursor-pointer">
-            <div className="flex gap-4">
+        <article className="border-b border-gray-200 dark:border-gray-800 p-3 md:p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors cursor-pointer">
+            <div className="flex gap-3 md:gap-4">
                 <Link href={`/user/${post.profiles.username}`} className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                    <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 bg-cover bg-center hover:opacity-80 transition-opacity" style={{ backgroundImage: post.profiles.avatar_url ? `url(${post.profiles.avatar_url})` : undefined }} />
+                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gray-200 dark:bg-gray-700 bg-cover bg-center hover:opacity-80 transition-opacity border border-gray-100 dark:border-gray-800" style={{ backgroundImage: post.profiles.avatar_url ? `url(${post.profiles.avatar_url})` : undefined }} />
                 </Link>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start">
-                        <div className="flex gap-2 items-center flex-wrap">
-                            <Link href={`/user/${post.profiles.username}`} className="font-bold hover:underline" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex gap-1.5 items-center flex-wrap min-w-0">
+                            <Link href={`/user/${post.profiles.username}`} className="font-bold hover:underline truncate max-w-[120px] md:max-w-none text-[15px] md:text-base" onClick={(e) => e.stopPropagation()}>
                                 {post.profiles.display_name || post.profiles.username}
                             </Link>
-                            <Link href={`/user/${post.profiles.username}`} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300" onClick={(e) => e.stopPropagation()}>
+                            <Link href={`/user/${post.profiles.username}`} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 truncate max-w-[80px] md:max-w-none text-sm" onClick={(e) => e.stopPropagation()}>
                                 @{post.profiles.username}
                             </Link>
-                            <span className="text-gray-500">·</span>
-                            <span className="text-gray-500 text-sm hover:underline">
+                            <span className="text-gray-500 text-xs">·</span>
+                            <span className="text-gray-500 text-xs md:text-sm hover:underline whitespace-nowrap">
                                 {formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: tr })}
                             </span>
                         </div>
@@ -208,59 +208,51 @@ export function PostCard({ post }: PostProps) {
                                     e.stopPropagation()
                                     handleDelete()
                                 }}
-                                className="text-gray-500 hover:text-red-500 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                className="text-gray-400 hover:text-red-500 p-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                                 title="Sil"
                             >
                                 <Trash2 size={16} />
                             </button>
                         )}
                     </div>
-                    <p className="mt-2 text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+                    <p className="mt-1 md:mt-2 text-[15px] md:text-[16px] text-gray-900 dark:text-gray-100 whitespace-pre-wrap leading-normal">
                         {post.content}
                     </p>
                     {(post as any).image_url && (
                         <div className="mt-3" onClick={(e) => e.stopPropagation()}>
-                            <div className="max-w-lg rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-900">
+                            <div className="max-w-full rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-900 shadow-sm">
                                 <img
                                     src={(post as any).image_url}
                                     alt="Post media"
-                                    className="max-h-[500px] w-full h-auto object-contain"
+                                    className="max-h-[400px] md:max-h-[500px] w-full h-auto object-contain mx-auto"
                                 />
                             </div>
                         </div>
                     )}
 
-                    <div className="flex justify-between mt-4 text-gray-500 max-w-md">
+                    <div className="flex justify-between mt-3 md:mt-4 text-gray-500 max-w-md -ml-2">
                         <button
                             onClick={() => toggleComments()}
-                            className="flex items-center gap-2 hover:text-blue-500 group transition-colors"
+                            className="flex items-center gap-1 group transition-colors p-2 rounded-full hover:bg-blue-500/10 hover:text-blue-500 active:scale-95"
                             title="Yorum Yap"
                         >
-                            <div className="p-2 rounded-full group-hover:bg-blue-500/10 transition-colors">
-                                <MessageCircle size={18} />
-                            </div>
-                            <span className="text-sm">{commentCount > 0 ? commentCount : ''}</span>
+                            <MessageCircle size={18} className="md:w-5 md:h-5" />
+                            <span className="text-xs md:text-sm">{commentCount > 0 ? commentCount : ''}</span>
                         </button>
-                        <button className="flex items-center gap-2 hover:text-green-500 group transition-colors" title="Retweet">
-                            <div className="p-2 rounded-full group-hover:bg-green-500/10 transition-colors">
-                                <Repeat2 size={18} />
-                            </div>
-                            <span className="text-sm"></span>
+                        <button className="flex items-center gap-1 group transition-colors p-2 rounded-full hover:bg-green-500/10 hover:text-green-500 active:scale-95" title="Retweet">
+                            <Repeat2 size={18} className="md:w-5 md:h-5" />
+                            <span className="text-xs md:text-sm"></span>
                         </button>
-                        <button onClick={handleLike} className={`flex items-center gap-2 group transition-colors ${liked ? 'text-pink-600' : 'hover:text-pink-600'}`} title="Beğen">
-                            <div className="p-2 rounded-full group-hover:bg-pink-600/10 transition-colors">
-                                <Heart size={18} fill={liked ? "currentColor" : "none"} />
-                            </div>
-                            <span className="text-sm">{likesCount > 0 ? likesCount : ''}</span>
+                        <button onClick={handleLike} className={`flex items-center gap-1 group transition-colors p-2 rounded-full hover:bg-pink-600/10 active:scale-95 ${liked ? 'text-pink-600' : 'hover:text-pink-600'}`} title="Beğen">
+                            <Heart size={18} className="md:w-5 md:h-5" fill={liked ? "currentColor" : "none"} />
+                            <span className="text-xs md:text-sm">{likesCount > 0 ? likesCount : ''}</span>
                         </button>
                         <button
                             onClick={handleShare}
-                            className="flex items-center gap-2 hover:text-blue-500 group transition-colors"
+                            className="flex items-center gap-1 group transition-colors p-2 rounded-full hover:bg-blue-500/10 hover:text-blue-500 active:scale-95"
                             title="Paylaş / Linki Kopyala"
                         >
-                            <div className="p-2 rounded-full group-hover:bg-blue-500/10 transition-colors">
-                                <Share size={18} />
-                            </div>
+                            <Share size={18} className="md:w-5 md:h-5" />
                         </button>
                     </div>
 

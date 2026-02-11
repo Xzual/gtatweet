@@ -80,15 +80,14 @@ export function CreatePost() {
     if (!user) return null
 
     return (
-        <div className="border-b border-gray-200 dark:border-gray-800 p-4">
-            <div className="flex gap-4">
+        <div className="border-b border-gray-200 dark:border-gray-800 p-3 md:p-4">
+            <div className="flex gap-3 md:gap-4">
                 <div
-                    className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0 bg-cover bg-center overflow-hidden"
+                    className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0 bg-cover bg-center overflow-hidden border border-gray-100 dark:border-gray-800"
                     style={{ backgroundImage: avatarUrl ? `url(${avatarUrl})` : undefined }}
                 >
                     {!avatarUrl && (
                         <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-200 dark:bg-gray-700">
-                            {/* Fallback icon if no avatar */}
                             <div className="w-full h-full bg-gray-300 dark:bg-gray-600" />
                         </div>
                     )}
@@ -98,39 +97,39 @@ export function CreatePost() {
                         value={content}
                         onChange={(e) => setContent(e.target.value)}
                         placeholder="Neler oluyor?!"
-                        className="w-full bg-transparent border-none focus:ring-0 text-xl resize-none min-h-[50px] placeholder-gray-500 text-gray-900 dark:text-white outline-none"
+                        className="w-full bg-transparent border-none focus:ring-0 text-lg md:text-xl resize-none min-h-[50px] placeholder-gray-500 text-gray-900 dark:text-white outline-none"
                         maxLength={280}
                     />
 
                     {previewUrl && (
                         <div className="relative mt-2 mb-4">
-                            <img src={previewUrl} alt="Preview" className="rounded-2xl max-h-80 w-auto object-cover border border-gray-200 dark:border-gray-800" />
+                            <img src={previewUrl} alt="Preview" className="rounded-2xl max-h-60 md:max-h-80 w-auto object-cover border border-gray-200 dark:border-gray-800 shadow-sm" />
                             <button
                                 onClick={() => {
                                     setImageFile(null)
                                     setPreviewUrl(null)
                                     if (fileInputRef.current) fileInputRef.current.value = ''
                                 }}
-                                className="absolute top-2 left-2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors"
+                                className="absolute top-2 left-2 bg-black/60 text-white rounded-full p-1.5 hover:bg-black/80 transition-colors backdrop-blur-sm"
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                             </button>
                         </div>
                     )}
 
                     {content.length > 0 && (
-                        <div className="border-b border-gray-200 dark:border-gray-800 pb-2 mb-2">
-                            <span className={`text-xs ${content.length > 260 ? 'text-red-500' : 'text-blue-500'}`}>{280 - content.length} characters left</span>
+                        <div className="border-b border-gray-100 dark:border-gray-900 pb-2 mb-2">
+                            <span className={`text-[10px] md:text-xs font-medium ${content.length > 260 ? 'text-red-500' : 'text-blue-500'}`}>{280 - content.length} characters left</span>
                         </div>
                     )}
-                    <div className="flex justify-between items-center mt-2">
+                    <div className="flex justify-between items-center mt-1 md:mt-2">
                         <div className="flex gap-0 text-blue-500">
                             <button
                                 onClick={() => fileInputRef.current?.click()}
-                                className="p-2 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                                className="p-2 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all active:scale-90"
                                 title="Medya"
                             >
-                                <Image size={20} />
+                                <Image size={20} className="md:w-[22px] md:h-[22px]" />
                                 <input
                                     type="file"
                                     ref={fileInputRef}
@@ -139,12 +138,11 @@ export function CreatePost() {
                                     onChange={handleImageSelect}
                                 />
                             </button>
-
                         </div>
                         <button
                             onClick={handlePost}
                             disabled={isPosting || (!content.trim() && !imageFile)}
-                            className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1.5 px-4 md:py-2 md:px-5 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 text-sm md:text-base"
                         >
                             {isPosting ? 'Paylaşılıyor...' : 'Gönder'}
                         </button>
