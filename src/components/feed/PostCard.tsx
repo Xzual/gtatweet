@@ -1,0 +1,330 @@
+'use client'
+
+import { formatDistanceToNow } from 'date-fns'
+import { tr } from 'date-fns/locale'
+import { Trash2, Heart, MessageCircle, Repeat2, Share } from 'lucide-react'
+import { useAuth } from '@/context/AuthContext'
+import { supabase } from '@/utils/supabase/client'
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
+
+interface PostProps {
+    post: {
+        id: string
+        content: string
+        created_at: string
+        user_id: string
+        profiles: {
+            username: string
+            display_name: string
+            avatar_url: string | null
+        }
+    }
+}
+
+export function PostCard({ post }: PostProps) {
+    const { user } = useAuth()
+    const isOwner = user?.id === post.user_id
+    const [liked, setLiked] = useState(false)
+    const [likesCount, setLikesCount] = useState(0)
+    const [showComments, setShowComments] = useState(false)
+    const [comments, setComments] = useState<any[]>([])
+    const [newComment, setNewComment] = useState('')
+    const [commentCount, setCommentCount] = useState(0)
+
+    useEffect(() => {
+        const fetchData = async () => {
+            // Check if user liked the post
+            if (user) {
+                const { data: likeData } = await supabase
+                    .from('likes')
+                    .select('id')
+                    .eq('post_id', post.id)
+                    .eq('user_id', user.id)
+                    .single()
+                setLiked(!!likeData)
+            }
+
+            // Get total likes count
+            const { count: totalLikes } = await supabase
+                .from('likes')
+                .select('id', { count: 'exact', head: true })
+                .eq('post_id', post.id)
+            setLikesCount(totalLikes || 0)
+
+            // Get total comments count
+            const { count: totalComments } = await supabase
+                .from('comments')
+                .select('id', { count: 'exact', head: true })
+                .eq('post_id', post.id)
+            setCommentCount(totalComments || 0)
+        }
+
+        fetchData()
+
+        // Realtime likes
+        const likesChannel = supabase
+            .channel(`post_likes_${post.id}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'likes',
+                filter: `post_id=eq.${post.id}`
+            }, () => {
+                // Refresh count and user status on any like change
+                fetchData()
+            })
+            .subscribe()
+
+        // Realtime comments
+        const commentsChannel = supabase
+            .channel(`post_comments_${post.id}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'comments',
+                filter: `post_id=eq.${post.id}`
+            }, (payload) => {
+                // Update total count
+                supabase.from('comments').select('id', { count: 'exact', head: true }).eq('post_id', post.id)
+                    .then(({ count }) => setCommentCount(count || 0))
+
+                // If comments panel is open, update comments list
+                if (showComments) {
+                    if (payload.eventType === 'INSERT') {
+                        // Fetch the full comment with profile
+                        supabase.from('comments').select('*, profiles(username, display_name, avatar_url)').eq('id', payload.new.id).single()
+                            .then(({ data }) => {
+                                if (data) setComments(prev => [...prev, data])
+                            })
+                    } else if (payload.eventType === 'DELETE') {
+                        setComments(prev => prev.filter(c => c.id !== payload.old.id))
+                    }
+                }
+            })
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(likesChannel)
+            supabase.removeChannel(commentsChannel)
+        }
+    }, [post.id, user, showComments])
+
+    const handleDelete = async () => {
+        if (!confirm('Bu gönderiyi silmek istediğinizden emin misiniz?')) return
+
+        const { error } = await supabase.from('posts').delete().eq('id', post.id)
+        if (error) {
+            alert('Silme işlemi başarısız oldu')
+        }
+    }
+
+    const handleLike = async () => {
+        if (!user) return
+
+        const isLiking = !liked
+        setLiked(isLiking)
+        setLikesCount(prev => isLiking ? prev + 1 : prev - 1)
+
+        try {
+            if (isLiking) {
+                await supabase.from('likes').insert({ post_id: post.id, user_id: user.id })
+            } else {
+                await supabase.from('likes').delete().match({ post_id: post.id, user_id: user.id })
+            }
+        } catch (error) {
+            console.error(error)
+            setLiked(!isLiking)
+            setLikesCount(prev => !isLiking ? prev + 1 : prev - 1)
+        }
+    }
+
+    const toggleComments = async () => {
+        if (!showComments && comments.length === 0) {
+            // Fetch comments when opening
+            const { data } = await supabase
+                .from('comments')
+                .select('*, profiles(username, display_name, avatar_url)')
+                .eq('post_id', post.id)
+                .order('created_at', { ascending: true })
+
+            if (data) setComments(data)
+        }
+        setShowComments(!showComments)
+    }
+
+    const handleSendComment = async () => {
+        if (!newComment.trim() || !user) return
+
+        const { data, error } = await supabase
+            .from('comments')
+            .insert({
+                post_id: post.id,
+                user_id: user.id,
+                content: newComment
+            })
+            .select('*, profiles(username, display_name, avatar_url)')
+            .single()
+
+        if (error) {
+            alert('Yorum gönderilemedi')
+        } else if (data) {
+            setComments([...comments, data])
+            setNewComment('')
+            setCommentCount(prev => prev + 1)
+        }
+    }
+
+    const handleShare = () => {
+        const url = `${window.location.origin}/post/${post.id}` // Hypothetical URL, effectively just copies generic link for now
+        navigator.clipboard.writeText(url).then(() => {
+            alert('Link kopyalandı!')
+        })
+    }
+
+    return (
+        <article className="border-b border-gray-200 dark:border-gray-800 p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors cursor-pointer">
+            <div className="flex gap-4">
+                <Link href={`/user/${post.profiles.username}`} className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 bg-cover bg-center hover:opacity-80 transition-opacity" style={{ backgroundImage: post.profiles.avatar_url ? `url(${post.profiles.avatar_url})` : undefined }} />
+                </Link>
+                <div className="flex-1">
+                    <div className="flex justify-between items-start">
+                        <div className="flex gap-2 items-center flex-wrap">
+                            <Link href={`/user/${post.profiles.username}`} className="font-bold hover:underline" onClick={(e) => e.stopPropagation()}>
+                                {post.profiles.display_name || post.profiles.username}
+                            </Link>
+                            <Link href={`/user/${post.profiles.username}`} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300" onClick={(e) => e.stopPropagation()}>
+                                @{post.profiles.username}
+                            </Link>
+                            <span className="text-gray-500">·</span>
+                            <span className="text-gray-500 text-sm hover:underline">
+                                {formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: tr })}
+                            </span>
+                        </div>
+                        {isOwner && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDelete()
+                                }}
+                                className="text-gray-500 hover:text-red-500 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                title="Sil"
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                        )}
+                    </div>
+                    <p className="mt-2 text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+                        {post.content}
+                    </p>
+                    {(post as any).image_url && (
+                        <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+                            <div className="max-w-lg rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-900">
+                                <img
+                                    src={(post as any).image_url}
+                                    alt="Post media"
+                                    className="max-h-[500px] w-full h-auto object-contain"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex justify-between mt-4 text-gray-500 max-w-md">
+                        <button
+                            onClick={() => toggleComments()}
+                            className="flex items-center gap-2 hover:text-blue-500 group transition-colors"
+                            title="Yorum Yap"
+                        >
+                            <div className="p-2 rounded-full group-hover:bg-blue-500/10 transition-colors">
+                                <MessageCircle size={18} />
+                            </div>
+                            <span className="text-sm">{commentCount > 0 ? commentCount : ''}</span>
+                        </button>
+                        <button className="flex items-center gap-2 hover:text-green-500 group transition-colors" title="Retweet">
+                            <div className="p-2 rounded-full group-hover:bg-green-500/10 transition-colors">
+                                <Repeat2 size={18} />
+                            </div>
+                            <span className="text-sm"></span>
+                        </button>
+                        <button onClick={handleLike} className={`flex items-center gap-2 group transition-colors ${liked ? 'text-pink-600' : 'hover:text-pink-600'}`} title="Beğen">
+                            <div className="p-2 rounded-full group-hover:bg-pink-600/10 transition-colors">
+                                <Heart size={18} fill={liked ? "currentColor" : "none"} />
+                            </div>
+                            <span className="text-sm">{likesCount > 0 ? likesCount : ''}</span>
+                        </button>
+                        <button
+                            onClick={handleShare}
+                            className="flex items-center gap-2 hover:text-blue-500 group transition-colors"
+                            title="Paylaş / Linki Kopyala"
+                        >
+                            <div className="p-2 rounded-full group-hover:bg-blue-500/10 transition-colors">
+                                <Share size={18} />
+                            </div>
+                        </button>
+                    </div>
+
+                    {showComments && (
+                        <div className="mt-4 border-t border-gray-100 dark:border-gray-800 pt-4" onClick={(e) => e.stopPropagation()}>
+                            {/* Cancel click propagation so clicking comment doesn't trigger card navigation */}
+                            <div className="space-y-4 mb-4">
+                                {comments.map((comment) => (
+                                    <div key={comment.id} className="flex gap-3 group">
+                                        <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0 bg-cover bg-center" style={{ backgroundImage: comment.profiles.avatar_url ? `url(${comment.profiles.avatar_url})` : undefined }} />
+                                        <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded-2xl rounded-tl-none flex-1 relative">
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-sm">{comment.profiles.display_name}</span>
+                                                    <span className="text-xs text-gray-500">{formatDistanceToNow(new Date(comment.created_at), { locale: tr })}</span>
+                                                </div>
+                                                {user?.id === comment.user_id && (
+                                                    <button
+                                                        onClick={async () => {
+                                                            if (!confirm('Yorumu silmek istediğinize emin misiniz?')) return
+
+                                                            const { error } = await supabase.from('comments').delete().eq('id', comment.id)
+                                                            if (error) {
+                                                                alert('Yorum silinemedi')
+                                                            } else {
+                                                                setComments(prev => prev.filter(c => c.id !== comment.id))
+                                                                setCommentCount(prev => prev - 1)
+                                                            }
+                                                        }}
+                                                        className="text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                                                        title="Yorumu sil"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <p className="text-sm mt-1 text-gray-800 dark:text-gray-200">{comment.content}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {user && (
+                                <div className="flex gap-2">
+                                    <input
+                                        value={newComment}
+                                        onChange={(e) => setNewComment(e.target.value)}
+                                        placeholder="Yanıtını gönder"
+                                        className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        onKeyDown={(e) => e.key === 'Enter' && handleSendComment()}
+                                    />
+                                    <button
+                                        onClick={handleSendComment}
+                                        disabled={!newComment.trim()}
+                                        className="text-blue-500 disabled:opacity-50 font-bold text-sm"
+                                    >
+                                        Gönder
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </article>
+    )
+}
