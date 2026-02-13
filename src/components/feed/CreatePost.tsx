@@ -5,7 +5,6 @@ import { Image, Send, Smile, Calendar, MapPin, AlignLeft } from 'lucide-react'
 import { supabase } from '@/utils/supabase/client'
 import { useAuth } from '@/context/AuthContext'
 import { UserSelector } from './UserSelector'
-import { GrokButton } from './GrokButton'
 import { fetchMentionSuggestions, MentionUser } from '@/utils/mentions'
 
 export function CreatePost() {
