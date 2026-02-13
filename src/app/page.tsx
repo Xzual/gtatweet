@@ -31,6 +31,7 @@ export default function Home() {
     fetchPosts()
 
     // Realtime subscription
+    console.log('Setting up Realtime subscription for posts...')
     const channel = supabase
       .channel('realtime posts')
       .on('postgres_changes', {
@@ -38,9 +39,10 @@ export default function Home() {
         schema: 'public',
         table: 'posts'
       }, (payload) => {
+        console.log('New post received via Realtime:', payload)
         // Fetch new post with profile data
         const fetchNewPost = async () => {
-          const { data } = await supabase
+          const { data, error } = await supabase
             .from('posts')
             .select(`
               *,
@@ -53,7 +55,11 @@ export default function Home() {
             .eq('id', payload.new.id)
             .single()
 
-          if (data) setPosts((current) => [data, ...current])
+          if (error) console.error('Error fetching new post details:', error)
+          if (data) {
+            console.log('New post added to feed:', data)
+            setPosts((current) => [data, ...current])
+          }
         }
         fetchNewPost()
       })
@@ -62,9 +68,12 @@ export default function Home() {
         schema: 'public',
         table: 'posts'
       }, (payload) => {
+        console.log('Post deleted via Realtime:', payload)
         setPosts((current) => current.filter(post => post.id !== payload.old.id))
       })
-      .subscribe()
+      .subscribe((status) => {
+        console.log('Realtime subscription status:', status)
+      })
 
     return () => {
       supabase.removeChannel(channel)

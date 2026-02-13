@@ -57,7 +57,7 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
         const { error } = await supabase
             .from('profiles')
             .update({ display_name: displayName, bio })
-            .eq('id', user?.id)
+            .eq('id', profile.id)
 
         if (!error) setIsEditing(false)
     }
@@ -86,7 +86,7 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
             const { error: updateError } = await supabase
                 .from('profiles')
                 .update({ avatar_url: publicUrl })
-                .eq('id', user?.id)
+                .eq('id', profile.id)
 
             if (updateError) throw updateError
 
@@ -123,7 +123,7 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
             const { error: updateError } = await supabase
                 .from('profiles')
                 .update({ cover_url: publicUrl })
-                .eq('id', user?.id)
+                .eq('id', profile.id)
 
             if (updateError) {
                 console.error("Column might not exist", updateError)
@@ -217,12 +217,19 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
                 <div className="mt-4">
                     {isEditing ? (
                         <div className="space-y-4 max-w-md">
-                            <input
-                                value={displayName}
-                                onChange={(e) => setDisplayName(e.target.value)}
-                                className="w-full text-xl font-bold bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none"
-                                placeholder="İsim"
-                            />
+                            <div className="flex items-center gap-2">
+                                <input
+                                    value={displayName}
+                                    onChange={(e) => setDisplayName(e.target.value)}
+                                    className="flex-1 text-xl font-bold bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none"
+                                    placeholder="İsim"
+                                />
+                                {profile.username === 'gtatweet_ai' && (
+                                    <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider shadow-sm shadow-blue-500/50">
+                                        AI BOT
+                                    </span>
+                                )}
+                            </div>
                             <textarea
                                 value={bio}
                                 onChange={(e) => setBio(e.target.value)}
@@ -233,7 +240,14 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
                         </div>
                     ) : (
                         <>
-                            <h1 className="text-xl font-bold">{displayName || profile.username}</h1>
+                            <div className="flex items-center gap-2">
+                                <h1 className="text-xl font-bold">{displayName || profile.username}</h1>
+                                {profile.username === 'gtatweet_ai' && (
+                                    <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider shadow-sm shadow-blue-500/50">
+                                        AI BOT
+                                    </span>
+                                )}
+                            </div>
                             <div className="text-gray-500">@{profile.username}</div>
                             <p className="mt-4 whitespace-pre-wrap">{bio}</p>
                         </>

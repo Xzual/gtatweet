@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from 'react'
 import { Image, Send, Smile, Calendar, MapPin, AlignLeft } from 'lucide-react'
 import { supabase } from '@/utils/supabase/client'
 import { useAuth } from '@/context/AuthContext'
+import { UserSelector } from './UserSelector'
+import { fetchMentionSuggestions, MentionUser } from '@/utils/mentions'
 
 export function CreatePost() {
     const { user } = useAuth()
@@ -12,7 +14,14 @@ export function CreatePost() {
     const [imageFile, setImageFile] = useState<File | null>(null)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const textAreaRef = useRef<HTMLTextAreaElement>(null)
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+
+    // Mentions state
+    const [showMentions, setShowMentions] = useState(false)
+    const [mentionQuery, setMentionQuery] = useState('')
+    const [suggestedUsers, setSuggestedUsers] = useState<MentionUser[]>([])
+    const [mentionIndex, setMentionIndex] = useState(0)
 
     // Fetch fresh profile data to ensure avatar is up to date
     useEffect(() => {
@@ -23,6 +32,71 @@ export function CreatePost() {
                 })
         }
     }, [user])
+
+    // Mention suggestion fetching
+    useEffect(() => {
+        if (showMentions) {
+            fetchMentionSuggestions(mentionQuery).then(users => {
+                // Ensure bot is suggested if query is empty or matches part of its name
+                if (!mentionQuery || 'gtatweet_ai'.includes(mentionQuery)) {
+                    const botAdded = users.find(u => u.username === 'gtatweet_ai')
+                    if (!botAdded) {
+                        // Normally you'd fetch it, but for speed we can fallback to standard fetch
+                    }
+                }
+                setSuggestedUsers(users)
+                setMentionIndex(0)
+            })
+        }
+    }, [showMentions, mentionQuery])
+
+    const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const value = e.target.value
+        setContent(value)
+
+        const cursorPosition = e.target.selectionStart
+        const textBeforeCursor = value.substring(0, cursorPosition)
+        const words = textBeforeCursor.split(/\s/)
+        const lastWord = words[words.length - 1]
+
+        if (lastWord.startsWith('@')) {
+            setShowMentions(true)
+            setMentionQuery(lastWord.substring(1))
+        } else {
+            setShowMentions(false)
+        }
+    }
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (showMentions && suggestedUsers.length > 0) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault()
+                setMentionIndex(prev => (prev + 1) % suggestedUsers.length)
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault()
+                setMentionIndex(prev => (prev - 1 + suggestedUsers.length) % suggestedUsers.length)
+            } else if (e.key === 'Enter') {
+                e.preventDefault()
+                selectUser(suggestedUsers[mentionIndex])
+            } else if (e.key === 'Escape') {
+                setShowMentions(false)
+            }
+        }
+    }
+
+    const selectUser = (selectedUser: MentionUser) => {
+        const cursorPosition = textAreaRef.current?.selectionStart || 0
+        const textBeforeCursor = content.substring(0, cursorPosition)
+        const textAfterCursor = content.substring(cursorPosition)
+
+        const words = textBeforeCursor.split(/\s/)
+        words[words.length - 1] = `@${selectedUser.username} `
+
+        const newContent = words.join(' ') + textAfterCursor
+        setContent(newContent)
+        setShowMentions(false)
+        textAreaRef.current?.focus()
+    }
 
     const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -57,13 +131,27 @@ export function CreatePost() {
                 imageUrl = publicUrl
             }
 
-            const { error } = await supabase.from('posts').insert({
+            const { data: newPost, error } = await supabase.from('posts').insert({
                 user_id: user.id,
                 content,
                 image_url: imageUrl
-            })
+            }).select().single()
 
             if (error) throw error
+
+            // Check for @gtatweet mention to trigger auto-reply
+            if (content.toLowerCase().includes('@gtatweet')) {
+                // Call Grok API in background
+                fetch('/api/grok', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        postId: newPost.id,
+                        content,
+                        replyToUsername: user.user_metadata?.username
+                    })
+                }).catch(err => console.error('Auto-Grok Error:', err))
+            }
 
             // Reset state
             setContent('')
@@ -92,14 +180,27 @@ export function CreatePost() {
                         </div>
                     )}
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 relative">
                     <textarea
+                        ref={textAreaRef}
                         value={content}
-                        onChange={(e) => setContent(e.target.value)}
+                        onChange={handleTextChange}
+                        onKeyDown={handleKeyDown}
                         placeholder="Neler oluyor?!"
                         className="w-full bg-transparent border-none focus:ring-0 text-lg md:text-xl resize-none min-h-[50px] placeholder-gray-500 text-gray-900 dark:text-white outline-none"
                         maxLength={280}
                     />
+
+                    {showMentions && (
+                        <UserSelector
+                            users={suggestedUsers}
+                            onSelect={selectUser}
+                            onClose={() => setShowMentions(false)}
+                            selectedIndex={mentionIndex}
+                            setSelectedIndex={setMentionIndex}
+                            position="bottom"
+                        />
+                    )}
 
                     {previewUrl && (
                         <div className="relative mt-2 mb-4">

@@ -1,36 +1,52 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# GTATweet 🏎️💨
 
-## Getting Started
+GTATweet, GTA evreni temalı, modern ve etkileşimli bir sosyal medya platformudur. Next.js, Supabase ve AI teknolojileri kullanılarak geliştirilmiştir.
 
-First, run the development server:
+## 🚀 Özellikler
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Modern Feed**: Gerçek zamanlı (Realtime) gönderi akışı ve etkileşimler.
+- **Grok AI Bot**: Platforma entegre, kullanıcılarla etkileşime giren ve zekice yanıtlar veren AI asistanı.
+- **Gelişmiş Etiketleme**: `@` işareti ile kullanıcıları gönderilerde ve yorumlarda etiketleme sistemi.
+- **Profil Yönetimi**: Özelleştirilebilir profiller, biyo, kapak fotoğrafları ve gönderi geçmişi.
+- **Premium UI**: Twitter/X estetiğinde, glassmorphism ve modern animasyonlarla zenginleştirilmiş arayüz.
+- **Bot Yönetimi**: Yetkili kullanıcılar için AI Bot profilini doğrudan arayüzden düzenleme imkanı.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🛠️ Teknoloji Yığını
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Framework**: [Next.js](https://nextjs.org/) (App Router)
+- **Database & Auth**: [Supabase](https://supabase.com/)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
+- **AI Engine**: [Groq API](https://groq.com/) (Llama 3)
+- **Icons**: [Lucide React](https://lucide.dev/)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 📦 Kurulum
 
-## Learn More
+1. Depoyu klonlayın:
+   ```bash
+   git clone [repository-url]
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+2. Bağımlılıkları yükleyin:
+   ```bash
+   npm install
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. `.env.local` dosyasını yapılandırın:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=your_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_key
+   SUPABASE_SERVICE_ROLE_KEY=your_service_key
+   GROQ_API_KEY=your_groq_key
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+4. Veritabanı kurulumunu yapın:
+   `database/` klasöründeki SQL dosyalarını sırasıyla Supabase SQL Editor'de çalıştırın.
 
-## Deploy on Vercel
+5. Uygulamayı başlatın:
+   ```bash
+   npm run dev
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 📄 Lisans
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Bu proje kişisel gelişim ve eğlence amacıyla geliştirilmiştir.

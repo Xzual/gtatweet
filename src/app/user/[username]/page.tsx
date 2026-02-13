@@ -55,17 +55,54 @@ export default function UserProfilePage() {
               `)
 
             if (activeTab === 'tweets') {
-                query = query.eq('user_id', profile.id)
-            } else if (activeTab === 'media') {
-                query = query.eq('user_id', profile.id).neq('image_url', null)
-            }
+                const { data } = await supabase.from('posts').select(`
+                    *,
+                    profiles (username, display_name, avatar_url),
+                    likes(count),
+                    comments(count)
+                `)
+                    .eq('user_id', profile.id)
+                    .order('created_at', { ascending: false })
+                if (data) setPosts(data)
+            } else if (activeTab === 'replies') {
+                // Fetch posts that the user has commented on
+                const { data: commentData } = await supabase
+                    .from('comments')
+                    .select(`
+                        post:posts (
+                            *,
+                            profiles (username, display_name, avatar_url),
+                            likes(count),
+                            comments(count)
+                        )
+                    `)
+                    .eq('user_id', profile.id)
+                    .order('created_at', { ascending: false })
 
-            const { data } = await query.order('created_at', { ascending: false })
-            if (data) setPosts(data)
+                if (commentData) {
+                    // Extract unique posts from comments
+                    const uniquePosts = Array.from(new Set(commentData.map(c => (c.post as any).id)))
+                        .map(id => commentData.find(c => (c.post as any).id === id)?.post)
+                        .filter(Boolean)
+                    setPosts(uniquePosts as any[])
+                }
+            } else if (activeTab === 'media') {
+                const { data } = await supabase.from('posts').select(`
+                    *,
+                    profiles (username, display_name, avatar_url),
+                    likes(count),
+                    comments(count)
+                `)
+                    .eq('user_id', profile.id)
+                    .neq('image_url', null)
+                    .order('created_at', { ascending: false })
+                if (data) setPosts(data)
+            }
         }
 
         if (profile) {
             fetchPosts()
+            // ... (rest of the effect)
 
             // Realtime subscription for this user's posts
             const channel = supabase
@@ -107,6 +144,11 @@ export default function UserProfilePage() {
     if (loading) return <div className="p-4 flex justify-center text-gray-500">Yükleniyor...</div>
     if (!profile) return <div className="p-4 text-center">Kullanıcı bulunamadı</div>
 
+    const BOT_ID = '00000000-0000-4000-a000-000000000000'
+    const MANAGER_ID = 'bc867c59-e8bc-4000-9c28-5ad02f51d1e5'
+
+    const isOwner = user?.id === profile?.id || (user?.id === MANAGER_ID && profile?.id === BOT_ID)
+
     return (
         <div>
             <div className="sticky top-0 bg-white/80 dark:bg-black/80 backdrop-blur-md p-2 border-b border-gray-200 dark:border-gray-800 z-10 flex items-center gap-4">
@@ -116,7 +158,7 @@ export default function UserProfilePage() {
                 </div>
             </div>
 
-            <ProfileHeader profile={profile} isOwner={user?.id === profile.id} />
+            <ProfileHeader profile={profile} isOwner={isOwner} />
 
             <div className="flex border-b border-gray-200 dark:border-gray-800">
                 <TabButton label="Gönderiler" active={activeTab === 'tweets'} onClick={() => setActiveTab('tweets')} />
@@ -128,8 +170,6 @@ export default function UserProfilePage() {
             <div>
                 {activeTab === 'likes' ? (
                     <div className="p-8 text-center text-gray-500">Beğenilen gönderiler yakında burada görünecek.</div>
-                ) : activeTab === 'replies' ? (
-                    <div className="p-8 text-center text-gray-500">Yanıtlar yakında burada görünecek.</div>
                 ) : (
                     <>
                         {posts.map((post) => (
@@ -137,7 +177,7 @@ export default function UserProfilePage() {
                         ))}
                         {posts.length === 0 && (
                             <div className="p-8 text-center text-gray-500">
-                                Henüz gönderi yok.
+                                {activeTab === 'replies' ? 'Henüz hiçbir gönderiye yanıt verilmemiş.' : 'Henüz gönderi yok.'}
                             </div>
                         )}
                     </>
