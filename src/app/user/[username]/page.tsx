@@ -194,7 +194,7 @@ function TabButton({ label, active, onClick }: { label: string; active: boolean;
             className={`flex-1 py-4 font-bold hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors relative ${active ? 'text-black dark:text-white' : 'text-gray-500'}`}
         >
             {label}
-            {active && <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-16 h-1 bg-blue-500 rounded-full" />}
+            {active && <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-16 h-1 bg-accent rounded-full" />}
         </button>
     )
 }

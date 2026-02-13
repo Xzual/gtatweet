@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Calendar, MapPin, Link as LinkIcon, Edit2, Camera } from 'lucide-react'
+import { Calendar, MapPin, Link as LinkIcon, Edit2, Camera, Mail, Music, Palette } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/utils/supabase/client'
 import { FollowButton } from '@/components/common/FollowButton'
@@ -14,9 +15,14 @@ interface ProfileHeaderProps {
 
 export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
     const { user } = useAuth()
+    const router = useRouter()
     const [isEditing, setIsEditing] = useState(false)
     const [displayName, setDisplayName] = useState(profile.display_name)
     const [bio, setBio] = useState(profile.bio || '')
+    const [location, setLocation] = useState(profile.location || '')
+    const [website, setWebsite] = useState(profile.website || '')
+    const [accentColor, setAccentColor] = useState(profile.accent_color || '#3b82f6')
+    const [profileSongUrl, setProfileSongUrl] = useState(profile.profile_song_url || '')
     const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url)
     const [coverUrl, setCoverUrl] = useState(profile.cover_url)
     const [isUploading, setIsUploading] = useState(false)
@@ -31,6 +37,10 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
     useEffect(() => {
         setDisplayName(profile.display_name)
         setBio(profile.bio || '')
+        setLocation(profile.location || '')
+        setWebsite(profile.website || '')
+        setAccentColor(profile.accent_color || '#3b82f6')
+        setProfileSongUrl(profile.profile_song_url || '')
         setAvatarUrl(profile.avatar_url)
         setCoverUrl(profile.cover_url)
     }, [profile])
@@ -57,7 +67,14 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
     const handleSave = async () => {
         const { error } = await supabase
             .from('profiles')
-            .update({ display_name: displayName, bio })
+            .update({
+                display_name: displayName,
+                bio,
+                location,
+                website,
+                accent_color: accentColor,
+                profile_song_url: profileSongUrl
+            })
             .eq('id', profile.id)
 
         if (!error) setIsEditing(false)
@@ -204,13 +221,22 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
                                 {isEditing ? 'Kaydet' : 'Profili Düzenle'}
                             </button>
                         ) : (
-                            <FollowButton
-                                targetId={profile.id}
-                                variant="profile"
-                                onToggle={(isNowFollowing) => {
-                                    setFollowersCount(prev => isNowFollowing ? prev + 1 : prev - 1)
-                                }}
-                            />
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => router.push(`/messages?user=${profile.id}`)}
+                                    className="p-2 rounded-full border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                    title="Mesaj Gönder"
+                                >
+                                    <Mail size={20} />
+                                </button>
+                                <FollowButton
+                                    targetId={profile.id}
+                                    variant="profile"
+                                    onToggle={(isNowFollowing) => {
+                                        setFollowersCount(prev => isNowFollowing ? prev + 1 : prev - 1)
+                                    }}
+                                />
+                            </div>
                         )}
                     </div>
                 </div>
@@ -222,12 +248,12 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
                                 <input
                                     value={displayName}
                                     onChange={(e) => setDisplayName(e.target.value)}
-                                    className="flex-1 text-xl font-bold bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none"
+                                    className="flex-1 text-xl font-bold bg-transparent border-b border-gray-300 focus:border-accent focus:outline-none"
                                     placeholder="İsim"
                                 />
                                 <VerifiedBadge size={18} />
                                 {profile.username === 'gtatweet_ai' && (
-                                    <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider shadow-sm shadow-blue-500/50">
+                                    <span className="bg-gradient-to-r from-accent to-purple-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider shadow-sm shadow-accent/50">
                                         AI BOT
                                     </span>
                                 )}
@@ -235,10 +261,59 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
                             <textarea
                                 value={bio}
                                 onChange={(e) => setBio(e.target.value)}
-                                className="w-full bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none resize-none"
+                                className="w-full bg-transparent border-b border-gray-300 focus:border-accent focus:outline-none resize-none"
                                 placeholder="Biyografi"
                                 rows={3}
                             />
+                            <input
+                                type="text"
+                                value={location}
+                                onChange={(e) => setLocation(e.target.value)}
+                                placeholder="Konum"
+                                className="w-full bg-transparent border-b border-gray-300 focus:border-accent focus:outline-none"
+                            />
+                            <input
+                                type="text"
+                                value={website}
+                                onChange={(e) => setWebsite(e.target.value)}
+                                placeholder="Web sitesi"
+                                className="w-full bg-transparent border-b border-gray-300 focus:border-accent focus:outline-none"
+                            />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
+                                        <Palette size={14} /> Tema Rengi
+                                    </label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#000000'].map((color) => (
+                                            <button
+                                                key={color}
+                                                onClick={() => setAccentColor(color)}
+                                                className={`w-8 h-8 rounded-full border-2 transition-transform active:scale-90 ${accentColor === color ? 'border-accent scale-110' : 'border-transparent'}`}
+                                                style={{ backgroundColor: color }}
+                                            />
+                                        ))}
+                                        <input
+                                            type="color"
+                                            value={accentColor}
+                                            onChange={(e) => setAccentColor(e.target.value)}
+                                            className="w-8 h-8 rounded-full overflow-hidden border-none p-0 cursor-pointer"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
+                                        <Music size={14} /> Profil Müziği (URL)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={profileSongUrl}
+                                        onChange={(e) => setProfileSongUrl(e.target.value)}
+                                        placeholder="MP3/SoundCloud linki"
+                                        className="w-full bg-gray-100 dark:bg-gray-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                                    />
+                                </div>
+                            </div>
                         </div>
                     ) : (
                         <>

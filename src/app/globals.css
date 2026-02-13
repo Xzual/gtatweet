@@ -12,6 +12,8 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --color-accent: var(--accent-color);
+  --color-accent-hover: var(--accent-color-hover);
 }
 
 .dark {
@@ -19,8 +21,8 @@
   --foreground: #ededed;
 }
 
-/* Default to dark mode if no preference or strict system pref? 
-   User wants default dark. 
+/* Default to dark mode if no preference or strict system pref?
+   User wants default dark.
    We can enforce .dark class on html/body by default.
 */
 

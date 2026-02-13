@@ -2,7 +2,7 @@
 
 import { formatDistanceToNow } from 'date-fns'
 import { tr } from 'date-fns/locale'
-import { Trash2, Heart, MessageCircle, Repeat2, Share } from 'lucide-react'
+import { Trash2, Heart, MessageCircle, Repeat2, Share, Bookmark } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/utils/supabase/client'
 import { useState, useEffect, useRef } from 'react'
@@ -11,6 +11,12 @@ import { GrokButton } from './GrokButton'
 import { UserSelector } from './UserSelector'
 import { fetchMentionSuggestions, MentionUser } from '@/utils/mentions'
 import { VerifiedBadge } from '../common/VerifiedBadge'
+
+const getYouTubeId = (url: string) => {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/
+    const match = url.match(regExp)
+    return (match && match[2].length === 11) ? match[2] : null
+}
 
 interface PostProps {
     post: {
@@ -23,6 +29,8 @@ interface PostProps {
             display_name: string
             avatar_url: string | null
         }
+        poll_data?: any
+        media_type?: 'image' | 'video'
     }
 }
 
@@ -35,6 +43,9 @@ export function PostCard({ post }: PostProps) {
     const [comments, setComments] = useState<any[]>([])
     const [newComment, setNewComment] = useState('')
     const [commentCount, setCommentCount] = useState(0)
+    const [isBookmarked, setIsBookmarked] = useState(false)
+    const [userVote, setUserVote] = useState<number | null>(null)
+    const [pollResults, setPollResults] = useState<any>(post.poll_data)
 
     // Mentions state for comments
     const [showMentions, setShowMentions] = useState(false)
@@ -113,6 +124,46 @@ export function PostCard({ post }: PostProps) {
                     .eq('user_id', user.id)
                     .single()
                 setLiked(!!likeData)
+
+                // Check if user bookmarked the post
+                const { data: bookmarkData } = await supabase
+                    .from('bookmarks')
+                    .select('id')
+                    .eq('post_id', post.id)
+                    .eq('user_id', user.id)
+                    .single()
+                setIsBookmarked(!!bookmarkData)
+
+                // Check poll vote
+                if (post.poll_data) {
+                    const { data: voteData } = await supabase
+                        .from('poll_votes')
+                        .select('option_index')
+                        .eq('post_id', post.id)
+                        .eq('user_id', user.id)
+                        .single()
+                    if (voteData) setUserVote(voteData.option_index)
+                }
+            }
+
+            // Real-time poll updates
+            if (post.poll_data) {
+                const channel = supabase
+                    .channel(`poll_updates_${post.id}`)
+                    .on('postgres_changes' as any, {
+                        event: 'UPDATE',
+                        table: 'posts',
+                        filter: `id=eq.${post.id}`
+                    }, (payload: any) => {
+                        if (payload.new.poll_data) {
+                            setPollResults(payload.new.poll_data)
+                        }
+                    })
+                    .subscribe()
+
+                return () => {
+                    supabase.removeChannel(channel)
+                }
             }
 
             // Get total likes count
@@ -283,11 +334,46 @@ export function PostCard({ post }: PostProps) {
         }
     }
 
-    const handleShare = () => {
-        const url = `${window.location.origin}/post/${post.id}` // Hypothetical URL, effectively just copies generic link for now
-        navigator.clipboard.writeText(url).then(() => {
-            alert('Link kopyalandı!')
+    const handleShare = (e: React.MouseEvent) => {
+        e.stopPropagation()
+        const url = `${window.location.origin}/user/${post.profiles.username}`
+        navigator.clipboard.writeText(url)
+        alert('Link kopyalandı!')
+    }
+
+    const handleBookmark = async (e: React.MouseEvent) => {
+        e.stopPropagation()
+        if (!user) return
+
+        if (isBookmarked) {
+            setIsBookmarked(false)
+            await supabase.from('bookmarks').delete().eq('user_id', user.id).eq('post_id', post.id)
+        } else {
+            setIsBookmarked(true)
+            await supabase.from('bookmarks').insert({ user_id: user.id, post_id: post.id })
+        }
+    }
+
+    const handleVote = async (index: number, e: React.MouseEvent) => {
+        e.stopPropagation()
+        if (!user || userVote !== null) return
+
+        const newOptions = [...pollResults.options]
+        newOptions[index].votes += 1
+        const newPollData = { ...pollResults, options: newOptions }
+
+        setUserVote(index)
+        setPollResults(newPollData)
+
+        await supabase.from('poll_votes').insert({
+            post_id: post.id,
+            user_id: user.id,
+            option_index: index
         })
+
+        await supabase.from('posts').update({
+            poll_data: newPollData
+        }).eq('id', post.id)
     }
 
     return (
@@ -332,14 +418,75 @@ export function PostCard({ post }: PostProps) {
                     <p className="mt-1 md:mt-2 text-[15px] md:text-[16px] text-gray-900 dark:text-gray-100 whitespace-pre-wrap leading-normal">
                         {post.content}
                     </p>
+
+                    {getYouTubeId(post.content) && (
+                        <div className="mt-3 rounded-2xl overflow-hidden aspect-video border border-gray-100 dark:border-gray-800 shadow-sm" onClick={(e) => e.stopPropagation()}>
+                            <iframe
+                                src={`https://www.youtube.com/embed/${getYouTubeId(post.content)}`}
+                                title="YouTube video player"
+                                frameBorder="0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                                className="w-full h-full"
+                            ></iframe>
+                        </div>
+                    )}
                     {(post as any).image_url && (
                         <div className="mt-3" onClick={(e) => e.stopPropagation()}>
                             <div className="max-w-full rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-900 shadow-sm">
-                                <img
-                                    src={(post as any).image_url}
-                                    alt="Post media"
-                                    className="max-h-[400px] md:max-h-[500px] w-full h-auto object-contain mx-auto"
-                                />
+                                {post.media_type === 'video' ? (
+                                    <video
+                                        src={(post as any).image_url}
+                                        controls
+                                        className="max-h-[400px] md:max-h-[500px] w-full h-auto mx-auto"
+                                    />
+                                ) : (
+                                    <img
+                                        src={(post as any).image_url}
+                                        alt="Post media"
+                                        className="max-h-[400px] md:max-h-[500px] w-full h-auto object-contain mx-auto"
+                                    />
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {pollResults && (
+                        <div className="mt-4 space-y-2 mb-2" onClick={(e) => e.stopPropagation()}>
+                            {pollResults.options.map((option: any, index: number) => {
+                                const totalVotes = pollResults.options.reduce((sum: number, opt: any) => sum + opt.votes, 0)
+                                const percentage = totalVotes > 0 ? Math.round((option.votes / totalVotes) * 100) : 0
+                                const isVoted = userVote !== null
+                                const isUserChoice = userVote === index
+
+                                return (
+                                    <div key={index} className="relative group">
+                                        <button
+                                            disabled={isVoted}
+                                            onClick={(e) => handleVote(index, e)}
+                                            className={`w-full text-left p-3 rounded-xl border transition-all relative overflow-hidden flex justify-between items-center ${isVoted ? 'border-transparent cursor-default' : 'border-accent/30 hover:bg-accent/5 group'}`}
+                                        >
+                                            {isVoted && (
+                                                <div
+                                                    className={`absolute left-0 top-0 bottom-0 transition-all duration-1000 ${isUserChoice ? 'bg-accent/20' : 'bg-gray-200 dark:bg-gray-800'}`}
+                                                    style={{ width: `${percentage}%` }}
+                                                />
+                                            )}
+                                            <span className={`relative z-10 font-medium text-sm md:text-base ${isUserChoice ? 'text-accent font-bold' : ''}`}>
+                                                {option.text}
+                                                {isUserChoice && <span className="ml-2">✓</span>}
+                                            </span>
+                                            {isVoted && (
+                                                <span className="relative z-10 text-xs md:text-sm font-bold text-gray-500">
+                                                    %{percentage}
+                                                </span>
+                                            )}
+                                        </button>
+                                    </div>
+                                )
+                            })}
+                            <div className="text-[12px] text-gray-500 mt-2 ml-1">
+                                {pollResults.options.reduce((sum: number, opt: any) => sum + opt.votes, 0)} oy · 24s kaldı
                             </div>
                         </div>
                     )}
@@ -367,6 +514,13 @@ export function PostCard({ post }: PostProps) {
                             title="Paylaş / Linki Kopyala"
                         >
                             <Share size={18} className="md:w-5 md:h-5" />
+                        </button>
+                        <button
+                            onClick={handleBookmark}
+                            className={`p-2 rounded-full transition-colors ${isBookmarked ? 'text-accent' : 'hover:bg-accent/10 hover:text-accent'}`}
+                            title="Yer İşareti"
+                        >
+                            <Bookmark size={18} fill={isBookmarked ? "currentColor" : "none"} />
                         </button>
                         <GrokButton
                             postId={post.id}

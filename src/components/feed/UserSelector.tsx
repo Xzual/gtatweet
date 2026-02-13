@@ -50,7 +50,7 @@ export function UserSelector({ users, onSelect, onClose, selectedIndex, setSelec
                     onClick={() => onSelect(user)}
                     onMouseEnter={() => setSelectedIndex(index)}
                     className={`flex items-center gap-3 p-3 cursor-pointer transition-colors ${index === selectedIndex
-                        ? 'bg-blue-50 dark:bg-blue-900/20'
+                        ? 'bg-accent/10'
                         : 'hover:bg-gray-50 dark:hover:bg-gray-900'
                         }`}
                 >
@@ -63,7 +63,7 @@ export function UserSelector({ users, onSelect, onClose, selectedIndex, setSelec
                             <span className="font-bold text-sm truncate">{user.display_name || user.username}</span>
                             <VerifiedBadge size={12} />
                             {user.username === 'gtatweet_ai' && (
-                                <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-[8px] px-1 py-0.5 rounded-full font-black uppercase flex-shrink-0">
+                                <span className="bg-gradient-to-r from-accent to-purple-500 text-white text-[8px] px-1 py-0.5 rounded-full font-black uppercase flex-shrink-0">
                                     AI
                                 </span>
                             )}

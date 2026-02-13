@@ -5,6 +5,7 @@ import { Image, Send, Smile, Calendar, MapPin, AlignLeft } from 'lucide-react'
 import { supabase } from '@/utils/supabase/client'
 import { useAuth } from '@/context/AuthContext'
 import { UserSelector } from './UserSelector'
+import { GrokButton } from './GrokButton'
 import { fetchMentionSuggestions, MentionUser } from '@/utils/mentions'
 
 export function CreatePost() {
@@ -16,6 +17,8 @@ export function CreatePost() {
     const fileInputRef = useRef<HTMLInputElement>(null)
     const textAreaRef = useRef<HTMLTextAreaElement>(null)
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+    const [showPollCreator, setShowPollCreator] = useState(false)
+    const [pollOptions, setPollOptions] = useState(['', ''])
 
     // Mentions state
     const [showMentions, setShowMentions] = useState(false)
@@ -98,7 +101,7 @@ export function CreatePost() {
         textAreaRef.current?.focus()
     }
 
-    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0]
             setImageFile(file)
@@ -131,10 +134,19 @@ export function CreatePost() {
                 imageUrl = publicUrl
             }
 
+            const pollData = showPollCreator && pollOptions.filter(opt => opt.trim()).length >= 2 ? {
+                options: pollOptions.filter(opt => opt.trim()).map(opt => ({ text: opt, votes: 0 })),
+                expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+            } : null
+
+            const mediaType = imageFile?.type.startsWith('video') ? 'video' : 'image'
+
             const { data: newPost, error } = await supabase.from('posts').insert({
                 user_id: user.id,
                 content,
-                image_url: imageUrl
+                image_url: imageUrl,
+                poll_data: pollData,
+                media_type: mediaType
             }).select().single()
 
             if (error) throw error
@@ -157,9 +169,12 @@ export function CreatePost() {
             setContent('')
             setImageFile(null)
             setPreviewUrl(null)
+            setShowPollCreator(false)
+            setPollOptions(['', ''])
+            if (fileInputRef.current) fileInputRef.current.value = ''
         } catch (error) {
             console.error('Error posting:', error)
-            alert('Gönderi paylaşılırken hata oluştu')
+            alert('Gönderi paylaşılırken bir hata oluştu.')
         } finally {
             setIsPosting(false)
         }
@@ -203,49 +218,111 @@ export function CreatePost() {
                     )}
 
                     {previewUrl && (
-                        <div className="relative mt-2 mb-4">
-                            <img src={previewUrl} alt="Preview" className="rounded-2xl max-h-60 md:max-h-80 w-auto object-cover border border-gray-200 dark:border-gray-800 shadow-sm" />
+                        <div className="relative mt-2 mb-4 group/preview">
+                            {imageFile?.type.startsWith('video') ? (
+                                <video src={previewUrl} controls className="rounded-2xl max-h-60 md:max-h-80 w-auto border border-gray-200 dark:border-gray-800 shadow-sm" />
+                            ) : (
+                                <img src={previewUrl} alt="Preview" className="rounded-2xl max-h-60 md:max-h-80 w-auto object-cover border border-gray-200 dark:border-gray-800 shadow-sm" />
+                            )}
                             <button
                                 onClick={() => {
                                     setImageFile(null)
                                     setPreviewUrl(null)
                                     if (fileInputRef.current) fileInputRef.current.value = ''
                                 }}
-                                className="absolute top-2 left-2 bg-black/60 text-white rounded-full p-1.5 hover:bg-black/80 transition-colors backdrop-blur-sm"
+                                className="absolute top-2 left-2 bg-black/60 text-white rounded-full p-1.5 hover:bg-black/80 transition-colors backdrop-blur-sm opacity-0 group-hover/preview:opacity-100 transition-opacity"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                             </button>
                         </div>
                     )}
 
+                    {showPollCreator && (
+                        <div className="mt-2 mb-4 p-3 border border-gray-100 dark:border-gray-800 rounded-2xl bg-gray-50/50 dark:bg-gray-900/50 relative">
+                            <button
+                                onClick={() => setShowPollCreator(false)}
+                                className="absolute top-2 right-2 text-gray-400 hover:text-red-500"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
+                            <div className="space-y-2 pr-6">
+                                {pollOptions.map((option, index) => (
+                                    <div key={index} className="relative group">
+                                        <input
+                                            type="text"
+                                            value={option}
+                                            onChange={(e) => {
+                                                const newOptions = [...pollOptions]
+                                                newOptions[index] = e.target.value
+                                                setPollOptions(newOptions)
+                                            }}
+                                            placeholder={`Seçenek ${index + 1}`}
+                                            className="w-full bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl px-4 py-2 text-sm focus:border-accent outline-none"
+                                            maxLength={25}
+                                        />
+                                        {pollOptions.length > 2 && (
+                                            <button
+                                                onClick={() => setPollOptions(pollOptions.filter((_, i) => i !== index))}
+                                                className="absolute right-3 top-2.5 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                                {pollOptions.length < 4 && (
+                                    <button
+                                        onClick={() => setPollOptions([...pollOptions, ''])}
+                                        className="text-accent text-sm font-medium hover:underline flex items-center gap-1 mt-1 pl-1"
+                                    >
+                                        + Seçenek ekle
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     {content.length > 0 && (
                         <div className="border-b border-gray-100 dark:border-gray-900 pb-2 mb-2">
-                            <span className={`text-[10px] md:text-xs font-medium ${content.length > 260 ? 'text-red-500' : 'text-blue-500'}`}>{280 - content.length} characters left</span>
+                            <span className={`text-[10px] md:text-xs font-medium ${content.length > 260 ? 'text-red-500' : 'text-accent'}`}>{280 - content.length} characters left</span>
                         </div>
                     )}
                     <div className="flex justify-between items-center mt-1 md:mt-2">
-                        <div className="flex gap-0 text-blue-500">
+                        <div className="flex gap-0 text-accent">
                             <button
                                 onClick={() => fileInputRef.current?.click()}
-                                className="p-2 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all active:scale-90"
-                                title="Medya"
+                                className={`p-2 rounded-full transition-colors ${previewUrl ? 'bg-accent/10 text-accent' : 'hover:bg-accent/10 text-accent'}`}
+                                title="Fotoğraf/Video Ekle"
                             >
-                                <Image size={20} className="md:w-[22px] md:h-[22px]" />
+                                <Image size={20} />
                                 <input
                                     type="file"
                                     ref={fileInputRef}
                                     className="hidden"
-                                    accept="image/*"
-                                    onChange={handleImageSelect}
+                                    accept="image/*,video/*"
+                                    onChange={handleMediaSelect}
                                 />
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowPollCreator(!showPollCreator)
+                                    if (!showPollCreator && previewUrl) {
+                                        setPreviewUrl(null)
+                                        setImageFile(null)
+                                    }
+                                }}
+                                className={`p-2 rounded-full transition-colors ${showPollCreator ? 'bg-accent/10 text-accent' : 'hover:bg-accent/10 text-accent'}`}
+                                title="Anket"
+                            >
+                                <AlignLeft size={20} />
                             </button>
                         </div>
                         <button
                             onClick={handlePost}
-                            disabled={isPosting || (!content.trim() && !imageFile)}
-                            className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1.5 px-4 md:py-2 md:px-5 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 text-sm md:text-base"
+                            disabled={isPosting || (!content.trim() && !imageFile && !showPollCreator)}
+                            className="bg-accent text-white px-6 py-2 rounded-full font-bold hover:opacity-90 disabled:opacity-50 transition-all active:scale-95 shadow-lg shadow-accent/20"
                         >
-                            {isPosting ? 'Paylaşılıyor...' : 'Gönder'}
+                            {isPosting ? '...' : 'Gönder'}
                         </button>
                     </div>
                 </div>

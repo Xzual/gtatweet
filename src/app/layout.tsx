@@ -5,6 +5,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { RightSidebar } from "@/components/layout/RightSidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
+import { DynamicTheme } from "@/components/DynamicTheme";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -42,6 +43,7 @@ export default function RootLayout({
       >
         <AuthProvider>
           <PresenceProvider>
+            <DynamicTheme />
             <div className="min-h-screen flex w-full pb-20 md:pb-0">
               <Sidebar />
               <main className="flex-1 ml-0 md:ml-20 lg:ml-64 border-r border-gray-200 dark:border-gray-800 min-h-screen">
