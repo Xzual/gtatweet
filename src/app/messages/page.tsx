@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, useRef } from 'react'
+import { Suspense, useEffect, useState, useRef } from 'react'
 import { supabase } from '@/utils/supabase/client'
 import { useAuth } from '@/context/AuthContext'
 import { useSearchParams } from 'next/navigation'
@@ -10,7 +10,7 @@ import { Send, ChevronLeft, MoreVertical, Search, User, Mail } from 'lucide-reac
 import { formatDistanceToNow } from 'date-fns'
 import { tr } from 'date-fns/locale'
 
-export default function MessagesPage() {
+function MessagesContent() {
     const { user } = useAuth()
     const searchParams = useSearchParams()
     const targetUserId = searchParams.get('user')
@@ -266,5 +266,13 @@ export default function MessagesPage() {
                 )}
             </div>
         </div>
+    )
+}
+
+export default function MessagesPage() {
+    return (
+        <Suspense fallback={<div className="p-8 text-center text-gray-500">Yükleniyor...</div>}>
+            <MessagesContent />
+        </Suspense>
     )
 }
