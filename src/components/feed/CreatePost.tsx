@@ -138,7 +138,7 @@ export function CreatePost() {
                 expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
             } : null
 
-            const mediaType = imageFile?.type.startsWith('video') ? 'video' : 'image'
+            const mediaType = imageFile?.type?.startsWith('video') ? 'video' : 'image'
 
             const { data: newPost, error } = await supabase.from('posts').insert({
                 user_id: user.id,

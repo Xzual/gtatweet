@@ -121,7 +121,10 @@ function MessagesContent() {
                 content: messageContent
             })
 
-        if (!error) {
+        if (error) {
+            console.error('Error sending message:', error)
+            alert('Mesaj gönderilemedi: ' + error.message)
+        } else {
             // Update last_message_at
             await supabase
                 .from('conversations')
