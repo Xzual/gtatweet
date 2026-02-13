@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { MentionUser } from '@/utils/mentions'
+import { VerifiedBadge } from '@/components/common/VerifiedBadge'
 
 interface UserSelectorProps {
     users: MentionUser[]
@@ -60,6 +61,7 @@ export function UserSelector({ users, onSelect, onClose, selectedIndex, setSelec
                     <div className="flex flex-col min-w-0">
                         <div className="flex items-center gap-1 min-w-0">
                             <span className="font-bold text-sm truncate">{user.display_name || user.username}</span>
+                            <VerifiedBadge size={12} />
                             {user.username === 'gtatweet_ai' && (
                                 <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-[8px] px-1 py-0.5 rounded-full font-black uppercase flex-shrink-0">
                                     AI

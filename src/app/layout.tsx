@@ -27,6 +27,8 @@ export const metadata: Metadata = {
   },
 };
 
+import { PresenceProvider } from "@/context/PresenceContext";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -39,14 +41,16 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <AuthProvider>
-          <div className="min-h-screen flex w-full pb-20 md:pb-0">
-            <Sidebar />
-            <main className="flex-1 ml-0 md:ml-20 lg:ml-64 border-r border-gray-200 dark:border-gray-800 min-h-screen">
-              {children}
-            </main>
-            <RightSidebar />
-            <MobileNav />
-          </div>
+          <PresenceProvider>
+            <div className="min-h-screen flex w-full pb-20 md:pb-0">
+              <Sidebar />
+              <main className="flex-1 ml-0 md:ml-20 lg:ml-64 border-r border-gray-200 dark:border-gray-800 min-h-screen">
+                {children}
+              </main>
+              <RightSidebar />
+              <MobileNav />
+            </div>
+          </PresenceProvider>
         </AuthProvider>
       </body>
     </html>

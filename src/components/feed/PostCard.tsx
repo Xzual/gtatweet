@@ -10,6 +10,7 @@ import Link from 'next/link'
 import { GrokButton } from './GrokButton'
 import { UserSelector } from './UserSelector'
 import { fetchMentionSuggestions, MentionUser } from '@/utils/mentions'
+import { VerifiedBadge } from '../common/VerifiedBadge'
 
 interface PostProps {
     post: {
@@ -298,8 +299,9 @@ export function PostCard({ post }: PostProps) {
                 <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start">
                         <div className="flex gap-1.5 items-center flex-wrap min-w-0">
-                            <Link href={`/user/${post.profiles.username}`} className="font-bold hover:underline truncate max-w-[120px] md:max-w-none text-[15px] md:text-base" onClick={(e) => e.stopPropagation()}>
+                            <Link href={`/user/${post.profiles.username}`} className="font-bold hover:underline truncate max-w-[120px] md:max-w-none text-[15px] md:text-base flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                 {post.profiles.display_name || post.profiles.username}
+                                <VerifiedBadge size={14} />
                             </Link>
                             {post.profiles.username === 'gtatweet_ai' && (
                                 <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider">
@@ -390,7 +392,10 @@ export function PostCard({ post }: PostProps) {
                                             <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded-2xl rounded-tl-none flex-1 relative">
                                                 <div className="flex justify-between items-start">
                                                     <div className="flex items-center gap-2">
-                                                        <span className="font-bold text-sm">{comment.profiles.display_name}</span>
+                                                        <span className="font-bold text-sm flex items-center gap-1">
+                                                            {comment.profiles.display_name}
+                                                            <VerifiedBadge size={12} />
+                                                        </span>
                                                         {comment.profiles.username === 'gtatweet_ai' && (
                                                             <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-[8px] px-1 py-0.5 rounded-full font-black uppercase tracking-wider">
                                                                 AI

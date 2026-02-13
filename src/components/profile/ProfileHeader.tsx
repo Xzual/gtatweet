@@ -5,6 +5,7 @@ import { Calendar, MapPin, Link as LinkIcon, Edit2, Camera } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/utils/supabase/client'
 import { FollowButton } from '@/components/common/FollowButton'
+import { VerifiedBadge } from '@/components/common/VerifiedBadge'
 
 interface ProfileHeaderProps {
     profile: any
@@ -224,6 +225,7 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
                                     className="flex-1 text-xl font-bold bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none"
                                     placeholder="İsim"
                                 />
+                                <VerifiedBadge size={18} />
                                 {profile.username === 'gtatweet_ai' && (
                                     <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider shadow-sm shadow-blue-500/50">
                                         AI BOT
@@ -241,7 +243,10 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
                     ) : (
                         <>
                             <div className="flex items-center gap-2">
-                                <h1 className="text-xl font-bold">{displayName || profile.username}</h1>
+                                <h1 className="text-xl font-bold flex items-center gap-1">
+                                    {displayName || profile.username}
+                                    <VerifiedBadge size={18} />
+                                </h1>
                                 {profile.username === 'gtatweet_ai' && (
                                     <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider shadow-sm shadow-blue-500/50">
                                         AI BOT
