@@ -19,11 +19,47 @@ export function RightSidebar() {
 
     useEffect(() => {
         const fetchTrends = async () => {
-            // Remove limit(3) to show all trending posts
-            const { data } = await supabase.from('posts').select('*, profiles(*)').order('created_at', { ascending: false })
+            const { data } = await supabase
+                .from('posts')
+                .select('*, profiles(*)')
+                .order('created_at', { ascending: false })
+                .limit(4)
             if (data) setTrends(data)
         }
+
         fetchTrends()
+
+        // Realtime subscription for trends
+        const channel = supabase
+            .channel('trends-realtime')
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'posts'
+            }, async (payload) => {
+                // Fetch the new post with profile info
+                const { data: newPost } = await supabase
+                    .from('posts')
+                    .select('*, profiles(*)')
+                    .eq('id', payload.new.id)
+                    .single()
+
+                if (newPost) {
+                    setTrends(current => [newPost, ...current].slice(0, 4))
+                }
+            })
+            .on('postgres_changes', {
+                event: 'DELETE',
+                schema: 'public',
+                table: 'posts'
+            }, (payload) => {
+                fetchTrends() // Re-fetch to keep it at 4
+            })
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel)
+        }
     }, [])
 
     useEffect(() => {
@@ -115,14 +151,14 @@ export function RightSidebar() {
             <div className="bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl overflow-hidden mb-4 shadow-sm">
                 <h2 className="text-xl font-black px-4 pt-4 pb-2">Gündemdekiler</h2>
                 <div className="flex flex-col">
-                    {trends.map((t, i) => (
+                    {trends.slice(0, 4).map((t, i) => (
                         <Link
                             key={i}
                             href={`/user/${t.profiles.username}`}
                             className="px-4 py-3 hover:bg-gray-200/50 dark:hover:bg-gray-800 transition-colors group cursor-pointer border-b border-gray-100/50 dark:border-gray-800/50 last:border-0"
                         >
                             <div className="flex justify-between items-start">
-                                <div className="text-[13px] text-gray-500">Türkiye konumunda gündem</div>
+                                <div className="text-[13px] text-gray-500">{i + 1}. sırada gündem</div>
                                 <div className="text-gray-400 group-hover:text-blue-500 transition-colors">
                                     <span className="text-lg font-bold leading-none">···</span>
                                 </div>
@@ -136,13 +172,6 @@ export function RightSidebar() {
                             </div>
                         </Link>
                     ))}
-
-                    <Trend topic="Yazılım" count="12.5B Tweet" category="Teknoloji" />
-                    <Trend topic="GTA VI" count="1.2M Tweet" category="Oyun" />
-
-                    <button className="px-4 py-4 text-blue-500 hover:bg-gray-200/50 dark:hover:bg-gray-800 transition-colors text-left text-[15px] font-medium">
-                        Daha fazla göster
-                    </button>
                 </div>
             </div>
 
@@ -191,20 +220,5 @@ export function RightSidebar() {
                 <span>© 2024 GTATweet Corp.</span>
             </div>
         </aside>
-    )
-}
-
-function Trend({ topic, count, category = "Gündem" }: { topic: string; count: string; category?: string }) {
-    return (
-        <div className="px-4 py-3 hover:bg-gray-200/50 dark:hover:bg-gray-800 transition-colors group cursor-pointer border-b border-gray-100/50 dark:border-gray-800/50 last:border-0">
-            <div className="flex justify-between items-start">
-                <div className="text-[13px] text-gray-500">{category} · Gündem</div>
-                <div className="text-gray-400 group-hover:text-blue-500 transition-colors">
-                    <span className="text-lg font-bold leading-none">···</span>
-                </div>
-            </div>
-            <div className="font-bold text-[15px] mt-0.5 group-hover:text-blue-600 dark:group-hover:text-blue-400">{topic}</div>
-            <div className="text-[13px] text-gray-500 mt-1">{count}</div>
-        </div>
     )
 }

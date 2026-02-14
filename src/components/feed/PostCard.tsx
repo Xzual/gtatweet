@@ -35,7 +35,9 @@ interface PostProps {
 }
 
 export function PostCard({ post }: PostProps) {
-    const { user } = useAuth()
+    const { user, isAiMode } = useAuth()
+    const AI_BOT_ID = '00000000-0000-4000-a000-000000000000'
+    const activeUserId = isAiMode ? AI_BOT_ID : user?.id
     const isOwner = user?.id === post.user_id
     const [liked, setLiked] = useState(false)
     const [likesCount, setLikesCount] = useState(0)
@@ -284,7 +286,7 @@ export function PostCard({ post }: PostProps) {
     }
 
     const handleSendComment = async () => {
-        if (!newComment.trim() || !user) return
+        if (!newComment.trim() || !activeUserId) return
 
         const commentText = newComment // Store content before clearing
         setNewComment('') // Clear input immediately for better UX
@@ -294,7 +296,7 @@ export function PostCard({ post }: PostProps) {
                 .from('comments')
                 .insert({
                     post_id: post.id,
-                    user_id: user.id,
+                    user_id: activeUserId,
                     content: commentText
                 })
                 .select('*, profiles(username, display_name, avatar_url)')
@@ -314,7 +316,7 @@ export function PostCard({ post }: PostProps) {
                         body: JSON.stringify({
                             postId: post.id,
                             content: commentText,
-                            replyToUsername: user.user_metadata?.username
+                            replyToUsername: user?.user_metadata?.username
                         })
                     })
                     const aiData = await response.json()
@@ -557,7 +559,7 @@ export function PostCard({ post }: PostProps) {
                                                         )}
                                                         <span className="text-xs text-gray-500">{formatDistanceToNow(new Date(comment.created_at), { locale: tr })}</span>
                                                     </div>
-                                                    {user?.id === comment.user_id && (
+                                                    {activeUserId === comment.user_id && (
                                                         <button
                                                             onClick={async () => {
                                                                 if (!confirm('Yorumu silmek istediğinize emin misiniz?')) return

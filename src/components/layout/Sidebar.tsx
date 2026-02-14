@@ -7,7 +7,7 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 import { usePathname } from 'next/navigation'
 
 export function Sidebar() {
-    const { user, signOut } = useAuth()
+    const { user, signOut, isAiMode, toggleAiMode } = useAuth()
 
     return (
         <aside className="fixed left-0 top-0 h-screen w-20 md:w-64 border-r border-gray-200 dark:border-gray-800 hidden md:flex flex-col items-center md:items-start p-4 bg-white dark:bg-black z-50">
@@ -33,14 +33,28 @@ export function Sidebar() {
                         <LogOut size={28} />
                         <span className="hidden md:inline text-xl">Çıkış Yap</span>
                     </button>
-                    <div className="mt-4 w-full">
-                        <button className="w-full bg-accent hover:opacity-90 text-white font-bold py-3 px-4 rounded-full transition-all duration-200 shadow-lg shadow-accent/20 active:scale-95 text-lg hidden lg:block">
-                            Gönder
-                        </button>
-                        <button className="w-fit mx-auto bg-accent hover:opacity-90 text-white font-bold p-3 rounded-full transition-all duration-200 shadow-lg shadow-accent/20 active:scale-95 lg:hidden flex items-center justify-center">
-                            <svg viewBox="0 0 24 24" aria-hidden="true" className="w-6 h-6 fill-current"><g><path d="M23 3c-6.62-.1-10.38 2.421-13.05 6.03C7.29 12.61 6 17.331 6 22h2c0-1.007.07-2.012.19-3H12c4.1 0 7.48-3.082 7.94-7.054C22.79 10.147 23.17 6.359 23 3zm-7 8h-1.5v2H14.5V11zM11.5 13h1.5v2h-1.5v-2z"></path></g></svg>
-                        </button>
-                    </div>
+                    {user?.id === 'bc867c59-e8bc-4000-9c28-5ad02f51d1e5' && (
+                        <div className="mt-4 w-full">
+                            <button
+                                onClick={toggleAiMode}
+                                className={`w-full font-bold py-3 px-4 rounded-full transition-all duration-200 shadow-lg active:scale-95 text-lg hidden lg:block ${isAiMode
+                                    ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-purple-500/20'
+                                    : 'bg-gray-800 dark:bg-gray-200 text-white dark:text-black shadow-gray-500/20'
+                                    }`}
+                            >
+                                {isAiMode ? 'AI Modu Aktif' : 'AI Eriş'}
+                            </button>
+                            <button
+                                onClick={toggleAiMode}
+                                className={`w-fit mx-auto font-bold p-3 rounded-full transition-all duration-200 shadow-lg active:scale-95 lg:hidden flex items-center justify-center ${isAiMode
+                                    ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
+                                    : 'bg-gray-800 dark:bg-gray-200 text-white dark:text-black'
+                                    }`}
+                            >
+                                <svg viewBox="0 0 24 24" aria-hidden="true" className="w-6 h-6 fill-current"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-5-9h10v2H7z" /></svg>
+                            </button>
+                        </div>
+                    )}
                 </>
             ) : (
                 <div className="space-y-2 w-full">

@@ -8,7 +8,9 @@ import { UserSelector } from './UserSelector'
 import { fetchMentionSuggestions, MentionUser } from '@/utils/mentions'
 
 export function CreatePost() {
-    const { user } = useAuth()
+    const { user, isAiMode } = useAuth()
+    const AI_BOT_ID = '00000000-0000-4000-a000-000000000000'
+    const activeUserId = isAiMode ? AI_BOT_ID : user?.id
     const [content, setContent] = useState('')
     const [isPosting, setIsPosting] = useState(false)
     const [imageFile, setImageFile] = useState<File | null>(null)
@@ -27,13 +29,13 @@ export function CreatePost() {
 
     // Fetch fresh profile data to ensure avatar is up to date
     useEffect(() => {
-        if (user) {
-            supabase.from('profiles').select('avatar_url').eq('id', user.id).single()
+        if (activeUserId) {
+            supabase.from('profiles').select('avatar_url').eq('id', activeUserId).single()
                 .then(({ data }) => {
-                    if (data?.avatar_url) setAvatarUrl(data.avatar_url)
+                    setAvatarUrl(data?.avatar_url || null)
                 })
         }
-    }, [user])
+    }, [activeUserId])
 
     // Mention suggestion fetching
     useEffect(() => {
@@ -109,7 +111,7 @@ export function CreatePost() {
     }
 
     const handlePost = async () => {
-        if ((!content.trim() && !imageFile) || !user) return
+        if ((!content.trim() && !imageFile) || !activeUserId) return
 
         setIsPosting(true)
         try {
@@ -117,7 +119,7 @@ export function CreatePost() {
 
             if (imageFile) {
                 const fileExt = imageFile.name.split('.').pop()
-                const fileName = `${user.id}-${Math.random()}.${fileExt}`
+                const fileName = `${activeUserId}-${Math.random()}.${fileExt}`
                 const filePath = `${fileName}`
 
                 const { error: uploadError } = await supabase.storage
@@ -141,7 +143,7 @@ export function CreatePost() {
             const mediaType = imageFile?.type?.startsWith('video') ? 'video' : 'image'
 
             const { data: newPost, error } = await supabase.from('posts').insert({
-                user_id: user.id,
+                user_id: activeUserId,
                 content,
                 image_url: imageUrl,
                 poll_data: pollData,
@@ -159,7 +161,7 @@ export function CreatePost() {
                     body: JSON.stringify({
                         postId: newPost.id,
                         content,
-                        replyToUsername: user.user_metadata?.username
+                        replyToUsername: user?.user_metadata?.username
                     })
                 }).catch(err => console.error('Auto-Grok Error:', err))
             }
