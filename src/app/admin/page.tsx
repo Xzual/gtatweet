@@ -8,12 +8,11 @@ export default function AdminPage() {
   const { user, loading } = useAuth()
   const [posts, setPosts] = useState<any[]>([])
   const [profiles, setProfiles] = useState<any[]>([])
-  const [aiSettings, setAiSettings] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [editing, setEditing] = useState<{ id: string, content: string } | null>(null)
-  const [editingAiPrompt, setEditingAiPrompt] = useState<string>('')
   const [query, setQuery] = useState('')
-  const [tab, setTab] = useState<'posts' | 'users' | 'ai'>('posts')
+  // AI settings removed
+  const [tab, setTab] = useState<'posts' | 'users'>('posts')
 
   useEffect(() => { fetchAll() }, [])
 
@@ -31,12 +30,7 @@ export default function AdminPage() {
       const rr = await r.json()
       setPosts(rr.posts || [])
 
-      const a = await fetch('/api/admin/ai-settings')
-      const aa = await a.json()
-      setAiSettings(aa || [])
-      // Set initial AI prompt for editing
-      const promptSetting = aa.find((s: any) => s.key === 'system_prompt')
-      if (promptSetting) setEditingAiPrompt(promptSetting.value)
+      // AI settings removed
     } catch (err) {
       console.error(err)
     } finally { setIsLoading(false) }
@@ -55,34 +49,7 @@ export default function AdminPage() {
     fetchAll()
   }
 
-  const saveAiSettings = async () => {
-    if (!editingAiPrompt.trim()) {
-      alert('Prompt boş olamaz')
-      return
-    }
-    try {
-      const response = await fetch('/api/admin/ai-settings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': user?.id || '',
-        },
-        body: JSON.stringify({
-          key: 'system_prompt',
-          value: editingAiPrompt,
-        }),
-      })
-      if (response.ok) {
-        alert('AI prompt kaydedildi')
-        fetchAll()
-      } else {
-        alert('Hata: ' + (await response.json()).error)
-      }
-    } catch (err) {
-      console.error('Error saving AI settings:', err)
-      alert('AI ayarları kaydedilemedi')
-    }
-  }
+  // AI settings removed
 
   const filteredProfiles = useMemo(() => profiles.filter(p => (p.username || '').toLowerCase().includes(query.toLowerCase()) || (p.display_name || '').toLowerCase().includes(query.toLowerCase())), [profiles, query])
   const filteredPosts = useMemo(() => posts.filter(p => (p.content || '').toLowerCase().includes(query.toLowerCase())), [posts, query])
@@ -176,40 +143,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* AI Ayarları Tab */}
-      {tab === 'ai' && (
-        <div className="p-4 bg-white dark:bg-gray-900 border rounded shadow-sm max-w-4xl">
-          <h2 className="text-lg font-semibold mb-4">🤖 AI Sistem Promptu</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold mb-2">Sistem Prompt</label>
-              <textarea
-                value={editingAiPrompt}
-                onChange={(e) => setEditingAiPrompt(e.target.value)}
-                className="w-full p-3 border rounded dark:bg-gray-800 dark:border-gray-700 min-h-[200px] font-mono text-sm"
-                placeholder="AI botunun sistem promptu..."
-              />
-              <p className="text-xs text-gray-500 mt-2">
-                Bu prompt Grok API'sine gönderiliyor. AI'nın davranışını ve stil kontrol et.
-              </p>
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => fetchAll()}
-                className="px-4 py-2 border rounded hover:bg-gray-100 dark:hover:bg-gray-800"
-              >
-                İptal
-              </button>
-              <button
-                onClick={saveAiSettings}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                Kaydet
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* AI settings removed from admin UI */}
 
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
