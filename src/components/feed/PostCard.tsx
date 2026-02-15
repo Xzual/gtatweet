@@ -49,6 +49,8 @@ export function PostCard({ post }: PostProps) {
     const [isBookmarked, setIsBookmarked] = useState(false)
     const [userVote, setUserVote] = useState<number | null>(null)
     const [pollResults, setPollResults] = useState<any>(post.poll_data)
+    const articleRef = useRef<HTMLElement | null>(null)
+    const [viewRecorded, setViewRecorded] = useState(false)
 
     // Mentions state for comments
     const [showMentions, setShowMentions] = useState(false)
@@ -56,6 +58,32 @@ export function PostCard({ post }: PostProps) {
     const [suggestedUsers, setSuggestedUsers] = useState<MentionUser[]>([])
     const [mentionIndex, setMentionIndex] = useState(0)
     const commentInputRef = useRef<HTMLInputElement>(null)
+
+    useEffect(() => {
+        // Auto-record view when post is visible on screen
+        const node = articleRef.current
+        if (!node) return
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting && !viewRecorded && user?.id) {
+                    // record view (ignore AI bot views)
+                    if (!isAiMode) {
+                        fetch('/api/posts/views', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ postId: post.id, userId: user.id }) })
+                            .then(() => {
+                                setViewRecorded(true)
+                                // notify SeenIndicator to refresh
+                                try { window.dispatchEvent(new CustomEvent('postViewRecorded', { detail: { postId: post.id } })) } catch (e) { }
+                            })
+                            .catch(err => console.error('record view error', err))
+                    }
+                }
+            })
+        }, { threshold: 0.5 })
+
+        observer.observe(node)
+        return () => observer.disconnect()
+    }, [post.id, user, isAiMode, viewRecorded])
 
     useEffect(() => {
         if (showMentions) {
@@ -380,7 +408,7 @@ export function PostCard({ post }: PostProps) {
     }
 
     return (
-        <article className="border-b border-gray-200 dark:border-gray-800 p-3 md:p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors cursor-pointer">
+        <article ref={(el) => { articleRef.current = el }} className="border-b border-gray-200 dark:border-gray-800 p-3 md:p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors cursor-pointer">
             <div className="flex gap-3 md:gap-4">
                 <Link href={`/user/${post.profiles.username}`} className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                     <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gray-200 dark:bg-gray-700 bg-cover bg-center hover:opacity-80 transition-opacity border border-gray-100 dark:border-gray-800" style={{ backgroundImage: post.profiles.avatar_url ? `url(${post.profiles.avatar_url})` : undefined }} />

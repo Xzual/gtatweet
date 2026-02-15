@@ -22,6 +22,16 @@ export default function SeenIndicator({ postId }: { postId: string }) {
 
   useEffect(() => { fetchPreview() }, [postId])
 
+  useEffect(() => {
+    const handler = (e: any) => {
+      try {
+        if (e?.detail?.postId === postId) fetchPreview()
+      } catch (err) { }
+    }
+    window.addEventListener('postViewRecorded', handler as EventListener)
+    return () => window.removeEventListener('postViewRecorded', handler as EventListener)
+  }, [postId])
+
   const openModal = async () => {
     // record view for current user when opening
     if (user?.id) {
