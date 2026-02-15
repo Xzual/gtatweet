@@ -9,6 +9,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { GrokButton } from './GrokButton'
 import { UserSelector } from './UserSelector'
+import SeenIndicator from './SeenIndicator'
 import { fetchMentionSuggestions, MentionUser } from '@/utils/mentions'
 import { VerifiedBadge } from '../common/VerifiedBadge'
 
@@ -493,7 +494,12 @@ export function PostCard({ post }: PostProps) {
                         </div>
                     )}
 
-                    <div className="flex justify-between mt-3 md:mt-4 text-gray-500 max-w-md -ml-2">
+                    <div className="flex items-center justify-between mt-3 md:mt-4 text-gray-500 max-w-md -ml-2">
+                        <div className="flex items-center gap-3">
+                            {/* Seen indicator */}
+                            {/* Added SeenIndicator component */}
+                            <SeenIndicator postId={post.id} />
+                        </div>
                         <button
                             onClick={() => toggleComments()}
                             className="flex items-center gap-1 group transition-colors p-2 rounded-full hover:bg-blue-500/10 hover:text-blue-500 active:scale-95"

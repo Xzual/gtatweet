@@ -88,3 +88,19 @@ DROP POLICY IF EXISTS "Herkes oyları görebilir" ON poll_votes;
 CREATE POLICY "Herkes oyları görebilir" ON poll_votes FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Kullanıcılar oy verebilir" ON poll_votes;
 CREATE POLICY "Kullanıcılar oy verebilir" ON poll_votes FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Post Views (Görüldü) Tablosu
+CREATE TABLE IF NOT EXISTS post_views (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    seen_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    UNIQUE(post_id, user_id)
+);
+
+ALTER TABLE post_views ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Herkes post görüntülerini görebilir" ON post_views;
+CREATE POLICY "Herkes post görüntülerini görebilir" ON post_views FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Kullanıcılar kendi görüntülemelerini ekleyebilir" ON post_views;
+CREATE POLICY "Kullanıcılar kendi görüntülemelerini ekleyebilir" ON post_views FOR INSERT WITH CHECK (auth.uid() = user_id);
+
