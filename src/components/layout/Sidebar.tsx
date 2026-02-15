@@ -4,10 +4,13 @@ import Link from 'next/link'
 import { Home, Search, User, LogOut, Bookmark, Mail } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { useState } from 'react'
+import { BugReportModal } from './BugReportModal'
 import { usePathname } from 'next/navigation'
 
 export function Sidebar() {
     const { user, signOut, isAiMode, toggleAiMode } = useAuth()
+    const [bugOpen, setBugOpen] = useState(false)
 
     return (
         <aside className="fixed left-0 top-0 h-screen w-20 md:w-64 border-r border-gray-200 dark:border-gray-800 hidden md:flex flex-col items-center md:items-start p-4 bg-white dark:bg-black z-50">
@@ -33,28 +36,26 @@ export function Sidebar() {
                         <LogOut size={28} />
                         <span className="hidden md:inline text-xl">Çıkış Yap</span>
                     </button>
-                    {user?.id === 'bc867c59-e8bc-4000-9c28-5ad02f51d1e5' && (
-                        <div className="mt-4 w-full">
-                            <button
-                                onClick={toggleAiMode}
-                                className={`w-full font-bold py-3 px-4 rounded-full transition-all duration-200 shadow-lg active:scale-95 text-lg hidden lg:block ${isAiMode
-                                    ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-purple-500/20'
-                                    : 'bg-gray-800 dark:bg-gray-200 text-white dark:text-black shadow-gray-500/20'
-                                    }`}
-                            >
-                                {isAiMode ? 'AI Modu Aktif' : 'AI Eriş'}
+                    {user?.id === 'bc867c59-e8bc-4000-9c28-5ad02f51d1e5' || user?.email === 'arda.yorulmazel9@gmail.com' ? (
+                        <div className="mt-4 w-full space-y-2">
+                            <button onClick={toggleAiMode} className={`w-full flex items-center justify-center gap-2 ${isAiMode ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white' : 'bg-gray-800 text-white'} font-bold py-3 rounded-full`}>
+                                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path d="M12 2a10 10 0 100 20 10 10 0 000-20z" /></svg>
+                                <span className="hidden lg:inline">{isAiMode ? 'AI Modu Aktif' : 'AI Erişimi'}</span>
                             </button>
-                            <button
-                                onClick={toggleAiMode}
-                                className={`w-fit mx-auto font-bold p-3 rounded-full transition-all duration-200 shadow-lg active:scale-95 lg:hidden flex items-center justify-center ${isAiMode
-                                    ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
-                                    : 'bg-gray-800 dark:bg-gray-200 text-white dark:text-black'
-                                    }`}
-                            >
-                                <svg viewBox="0 0 24 24" aria-hidden="true" className="w-6 h-6 fill-current"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-5-9h10v2H7z" /></svg>
-                            </button>
+
+                            <Link href="/admin" className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-pink-600 text-white font-bold py-3 rounded-full hover:opacity-95">
+                                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path d="M12 2v4M6.8 5.2l2.8 2.8M3 12h4M6.8 18.8l2.8-2.8M12 20v-4M17.2 18.8l-2.8-2.8M21 12h-4M17.2 5.2l-2.8 2.8" /></svg>
+                                <span className="hidden lg:inline">Admin</span>
+                            </Link>
                         </div>
-                    )}
+                    ) : null}
+                    <div className="mt-4 w-full">
+                        <button onClick={() => setBugOpen(true)} className="w-full flex items-center justify-center gap-2 bg-white/0 border border-gray-300 dark:border-gray-800 text-gray-700 dark:text-gray-300 py-2 rounded-full hover:bg-gray-50 dark:hover:bg-gray-900">
+                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path d="M12 2v4M6.8 5.2l2.8 2.8M3 12h4M6.8 18.8l2.8-2.8M12 20v-4M17.2 18.8l-2.8-2.8M21 12h-4M17.2 5.2l-2.8 2.8" /></svg>
+                            <span className="hidden lg:inline">Hata Bildir</span>
+                        </button>
+                    </div>
+                    <BugReportModal open={bugOpen} onClose={() => setBugOpen(false)} />
                 </>
             ) : (
                 <div className="space-y-2 w-full">

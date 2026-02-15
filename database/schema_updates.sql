@@ -45,6 +45,11 @@ ALTER TABLE posts ADD COLUMN IF NOT EXISTS media_type TEXT DEFAULT 'image';
 
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS accent_color TEXT DEFAULT '#3b82f6';
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS profile_song_url TEXT;
+-- Add commonly-used profile columns used by the app UI
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS location TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS website TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS cover_url TEXT;
 
 -- Realtime'ı aktif etme
 -- Not: Bu komutlar sadece veritabanı sahibi (super-user) tarafından çalıştırılabilirse web arayüzünden yapılması gerekebilir.

@@ -3,9 +3,16 @@ import { createClient } from '@supabase/supabase-js'
 
 // Bot UUID from SQL script
 const BOT_ID = '00000000-0000-4000-a000-000000000000'
+const DEFAULT_SYSTEM_PROMPT = "Sen GTATweet platformunun resmi AI botusun. Yanıtların kısa, öz, esprili ve GTA evreniyle uyumlu (alaycı/haşin) olmalı."
 
 // Simple rate limiting (in-memory, for production consider Redis/Upstash)
 const rateLimitMap = new Map<string, number>()
+
+// Supabase service role client for fetching AI settings
+const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+)
 
 export async function POST(req: Request) {
     try {
@@ -28,6 +35,22 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'AI servisi yapılandırılmamış (GROQ_API_KEY eksik).' }, { status: 500 })
         }
 
+        // Fetch system prompt from database
+        let systemPrompt = DEFAULT_SYSTEM_PROMPT
+        try {
+            const { data, error } = await supabase
+                .from('ai_settings')
+                .select('value')
+                .eq('key', 'system_prompt')
+                .single()
+            
+            if (data?.value) {
+                systemPrompt = data.value
+            }
+        } catch (err) {
+            console.log('Could not fetch AI settings, using default:', err)
+        }
+
         // Call Groq AI (OpenAI compatible)
         let prompt = `Aşağıdaki sosyal medya gönderisine kısa, zekice, biraz alaycı ve eğlenceli bir yorum yap. 
         Karakterin: GTATweet AI Botu. 
@@ -47,7 +70,7 @@ export async function POST(req: Request) {
             body: JSON.stringify({
                 model: "llama-3.3-70b-versatile",
                 messages: [
-                    { role: "system", content: "Sen GTATweet platformunun resmi AI botusun. Yanıtların kısa, öz, esprili ve GTA evreniyle uyumlu (alaycı/haşin) olmalı." },
+                    { role: "system", content: systemPrompt },
                     { role: "user", content: prompt }
                 ],
                 max_tokens: 150

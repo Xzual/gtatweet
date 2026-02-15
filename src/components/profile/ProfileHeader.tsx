@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Calendar, MapPin, Link as LinkIcon, Edit2, Camera, Mail, Music, Palette } from 'lucide-react'
+import { Calendar, MapPin, Link as LinkIcon, Edit2, Camera, Mail, Music, Palette, Play, Pause, Volume2, Upload } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/utils/supabase/client'
@@ -27,8 +27,14 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
     const [coverUrl, setCoverUrl] = useState(profile.cover_url)
     const [isUploading, setIsUploading] = useState(false)
     const [isCoverUploading, setIsCoverUploading] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
+    const [isMusicUploading, setIsMusicUploading] = useState(false)
+    const [isPlaying, setIsPlaying] = useState(false)
+    const [volume, setVolume] = useState(50)
+    const audioRef = useRef<HTMLAudioElement>(null)
     const avatarInputRef = useRef<HTMLInputElement>(null)
     const coverInputRef = useRef<HTMLInputElement>(null)
+    const musicInputRef = useRef<HTMLInputElement>(null)
 
     // Follow state (counts)
     const [followersCount, setFollowersCount] = useState(0)
@@ -43,7 +49,49 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
         setProfileSongUrl(profile.profile_song_url || '')
         setAvatarUrl(profile.avatar_url)
         setCoverUrl(profile.cover_url)
+        // Load saved volume level from profile
+        if (profile.profile_volume_level) {
+            setVolume(profile.profile_volume_level)
+        }
+        // Auto-play music when profile loads
+        if (profile.profile_song_url && audioRef.current) {
+            setTimeout(() => {
+                audioRef.current?.play().catch(() => {
+                    // Browser blocked autoplay, user must click play button
+                    console.log('Autoplay blocked by browser')
+                })
+            }, 500)
+        }
     }, [profile])
+
+    // Play/pause profile music on load and when URL changes
+    useEffect(() => {
+        if (audioRef.current && profileSongUrl) {
+            audioRef.current.src = profileSongUrl
+            audioRef.current.volume = volume / 100
+            if (isPlaying) {
+                audioRef.current.play().catch(err => console.log('Auto-play prevented:', err))
+            }
+        }
+    }, [profileSongUrl, volume, isPlaying])
+
+    // Save volume level to database (with debounce)
+    useEffect(() => {
+        const timer = setTimeout(async () => {
+            if (isOwner && volume !== (profile.profile_volume_level || 50)) {
+                try {
+                    await supabase
+                        .from('profiles')
+                        .update({ profile_volume_level: volume })
+                        .eq('id', user?.id || profile.id)
+                } catch (err) {
+                    console.error('Error saving volume:', err)
+                }
+            }
+        }, 1000) // Wait 1 sec after volume change before saving
+
+        return () => clearTimeout(timer)
+    }, [volume, isOwner, profile.profile_volume_level, user?.id, profile.id])
 
     useEffect(() => {
         const fetchFollowData = async () => {
@@ -65,19 +113,40 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
     }, [profile.id])
 
     const handleSave = async () => {
-        const { error } = await supabase
-            .from('profiles')
-            .update({
-                display_name: displayName,
-                bio,
-                location,
-                website,
-                accent_color: accentColor,
-                profile_song_url: profileSongUrl
-            })
-            .eq('id', profile.id)
+        try {
+            setIsSaving(true)
 
-        if (!error) setIsEditing(false)
+            const targetId = user?.id || profile.id
+
+            const { data, error } = await supabase
+                .from('profiles')
+                .update({
+                    display_name: displayName,
+                    bio,
+                    location,
+                    website,
+                    accent_color: accentColor,
+                    profile_song_url: profileSongUrl,
+                    profile_volume_level: volume
+                })
+                .eq('id', targetId)
+                .select()
+                .single()
+
+            if (error) {
+                console.error('Error updating profile:', error)
+                alert('Profil kaydedilirken bir hata oluştu: ' + (error.message || error))
+                return
+            }
+
+            setIsEditing(false)
+            router.refresh()
+        } catch (err) {
+            console.error('Unexpected error while saving profile:', err)
+            alert('Profil kaydedilirken beklenmeyen bir hata oluştu.')
+        } finally {
+            setIsSaving(false)
+        }
     }
 
     const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -157,8 +226,47 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
         }
     }
 
+    const handleMusicUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || !e.target.files[0]) return
+
+        const file = e.target.files[0]
+        if (!file.type.startsWith('audio/')) {
+            alert('Lütfen bir ses dosyası seçiniz.')
+            return
+        }
+
+        setIsMusicUploading(true)
+
+        try {
+            const formData = new FormData()
+            formData.append('file', file)
+            formData.append('userId', user?.id || profile.id)
+
+            const response = await fetch('/api/upload-music', {
+                method: 'POST',
+                body: formData,
+            })
+
+            const data = await response.json()
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Upload failed')
+            }
+
+            setProfileSongUrl(data.url)
+        } catch (error) {
+            console.error('Error uploading music:', error)
+            alert('Müzik yüklenirken hata oluştu: ' + (error instanceof Error ? error.message : 'Bilinmeyen hata'))
+        } finally {
+            setIsMusicUploading(false)
+        }
+    }
+
     return (
         <div>
+            {/* Audio player (hidden) */}
+            <audio ref={audioRef} onEnded={() => setIsPlaying(false)} />
+            
             {/* Cover Image */}
             <div
                 className="h-48 bg-gray-200 dark:bg-gray-800 w-full relative bg-cover bg-center group/cover"
@@ -217,8 +325,9 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
                             <button
                                 onClick={() => isEditing ? handleSave() : setIsEditing(true)}
                                 className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-full font-bold hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                disabled={isSaving}
                             >
-                                {isEditing ? 'Kaydet' : 'Profili Düzenle'}
+                                {isEditing ? (isSaving ? 'Kaydediliyor...' : 'Kaydet') : 'Profili Düzenle'}
                             </button>
                         ) : (
                             <div className="flex gap-2">
@@ -303,15 +412,63 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
-                                        <Music size={14} /> Profil Müziği (URL)
+                                        <Music size={14} /> Profil Müziği
                                     </label>
-                                    <input
-                                        type="text"
-                                        value={profileSongUrl}
-                                        onChange={(e) => setProfileSongUrl(e.target.value)}
-                                        placeholder="MP3/SoundCloud linki"
-                                        className="w-full bg-gray-100 dark:bg-gray-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                                    />
+                                    <div className="space-y-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => musicInputRef.current?.click()}
+                                            disabled={isMusicUploading}
+                                            className="w-full flex items-center justify-center gap-2 bg-accent/10 hover:bg-accent/20 text-accent rounded-lg px-3 py-2 text-sm font-semibold transition-colors disabled:opacity-50"
+                                        >
+                                            <Upload size={16} />
+                                            {isMusicUploading ? 'Yükleniyor...' : 'Müzik Dosyası Seç'}
+                                        </button>
+                                        <input
+                                            type="file"
+                                            ref={musicInputRef}
+                                            className="hidden"
+                                            accept="audio/*"
+                                            onChange={handleMusicUpload}
+                                        />
+                                        {profileSongUrl && (
+                                            <div className="space-y-2 bg-white dark:bg-gray-900 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (audioRef.current) {
+                                                                if (isPlaying) {
+                                                                    audioRef.current.pause()
+                                                                } else {
+                                                                    audioRef.current.play()
+                                                                }
+                                                                setIsPlaying(!isPlaying)
+                                                            }
+                                                        }}
+                                                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                                                    >
+                                                        {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+                                                    </button>
+                                                    <div className="flex-1 text-xs text-gray-600 dark:text-gray-400 truncate">
+                                                        Müzik yüklendi
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Volume2 size={14} className="text-gray-500" />
+                                                    <input
+                                                        type="range"
+                                                        min="0"
+                                                        max="100"
+                                                        value={volume}
+                                                        onChange={(e) => setVolume(Number(e.target.value))}
+                                                        className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-accent"
+                                                    />
+                                                    <span className="text-xs text-gray-500 w-8 text-right">{volume}%</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -330,6 +487,43 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
                             </div>
                             <div className="text-gray-500">@{profile.username}</div>
                             <p className="mt-4 whitespace-pre-wrap">{bio}</p>
+                            {profileSongUrl && (
+                                <div className="mt-4 space-y-2">
+                                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                                        <Music size={14} />
+                                        <span>Bu profilde müzik var 🎵</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 bg-gray-50 dark:bg-gray-900 p-3 rounded-lg">
+                                        <button
+                                            onClick={() => {
+                                                if (audioRef.current) {
+                                                    if (isPlaying) {
+                                                        audioRef.current.pause()
+                                                    } else {
+                                                        audioRef.current.play()
+                                                    }
+                                                    setIsPlaying(!isPlaying)
+                                                }
+                                            }}
+                                            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-full transition-colors flex-shrink-0"
+                                        >
+                                            {isPlaying ? <Pause size={18} /> : <Play size={18} />}
+                                        </button>
+                                        <div className="flex-1 flex items-center gap-2">
+                                            <Volume2 size={14} className="text-gray-500 flex-shrink-0" />
+                                            <input
+                                                type="range"
+                                                min="0"
+                                                max="100"
+                                                value={volume}
+                                                onChange={(e) => setVolume(Number(e.target.value))}
+                                                className="flex-1 h-2 bg-gray-300 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-accent"
+                                            />
+                                            <span className="text-xs text-gray-500 w-8 text-right flex-shrink-0">{volume}%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </>
                     )}
 
