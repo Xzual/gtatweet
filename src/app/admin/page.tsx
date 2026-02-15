@@ -12,7 +12,7 @@ export default function AdminPage() {
   const [editing, setEditing] = useState<{ id: string, content: string } | null>(null)
   const [query, setQuery] = useState('')
   // AI settings removed
-  const [tab, setTab] = useState<'posts' | 'users'>('posts')
+  const [tab, setTab] = useState<'posts' | 'users' | 'ai'>('posts')
 
   useEffect(() => { fetchAll() }, [])
 
