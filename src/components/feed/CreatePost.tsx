@@ -1,11 +1,17 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Image, Send, Smile, Calendar, MapPin, AlignLeft } from 'lucide-react'
+import { Image, AlignLeft, X } from 'lucide-react'
 import { supabase } from '@/utils/supabase/client'
 import { useAuth } from '@/context/AuthContext'
 import { UserSelector } from './UserSelector'
 import { fetchMentionSuggestions, MentionUser } from '@/utils/mentions'
+
+interface MediaPreview {
+    file: File
+    previewUrl: string
+    type: 'image' | 'video'
+}
 
 export function CreatePost() {
     const { user, isAiMode } = useAuth()
@@ -13,8 +19,7 @@ export function CreatePost() {
     const activeUserId = isAiMode ? AI_BOT_ID : user?.id
     const [content, setContent] = useState('')
     const [isPosting, setIsPosting] = useState(false)
-    const [imageFile, setImageFile] = useState<File | null>(null)
-    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+    const [mediaFiles, setMediaFiles] = useState<MediaPreview[]>([])
     const fileInputRef = useRef<HTMLInputElement>(null)
     const textAreaRef = useRef<HTMLTextAreaElement>(null)
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
@@ -103,36 +108,75 @@ export function CreatePost() {
     }
 
     const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0]
-            setImageFile(file)
-            setPreviewUrl(URL.createObjectURL(file))
+        if (e.target.files) {
+            const newFiles = Array.from(e.target.files)
+            
+            // Limit to 10 media items per post
+            const totalMedia = mediaFiles.length + newFiles.length
+            if (totalMedia > 10) {
+                alert('Maksimum 10 medya dosyası yükleyebilirsiniz.')
+                return
+            }
+
+            newFiles.forEach(file => {
+                const previewUrl = URL.createObjectURL(file)
+                const type = file.type.startsWith('video') ? 'video' : 'image'
+                
+                setMediaFiles(prev => [...prev, { file, previewUrl, type }])
+            })
+
+            // Reset input for re-selection
+            if (fileInputRef.current) {
+                fileInputRef.current.value = ''
+            }
         }
     }
 
+    const removeMedia = (index: number) => {
+        setMediaFiles(prev => {
+            const updated = [...prev]
+            // Revoke the object URL to free memory
+            URL.revokeObjectURL(updated[index].previewUrl)
+            updated.splice(index, 1)
+            return updated
+        })
+    }
+
     const handlePost = async () => {
-        if ((!content.trim() && !imageFile) || !activeUserId) return
+        if ((!content.trim() && mediaFiles.length === 0) || !activeUserId) return
 
         setIsPosting(true)
         try {
-            let imageUrl = null
+            const mediaArray = []
+            let imageUrl = null // For backward compatibility
 
-            if (imageFile) {
-                const fileExt = imageFile.name.split('.').pop()
-                const fileName = `${activeUserId}-${Math.random()}.${fileExt}`
-                const filePath = `${fileName}`
+            // Upload all media files
+            if (mediaFiles.length > 0) {
+                for (const media of mediaFiles) {
+                    const fileExt = media.file.name.split('.').pop()
+                    const fileName = `${activeUserId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`
+                    const filePath = `${fileName}`
 
-                const { error: uploadError } = await supabase.storage
-                    .from('post-images')
-                    .upload(filePath, imageFile)
+                    const { error: uploadError } = await supabase.storage
+                        .from('post-images')
+                        .upload(filePath, media.file)
 
-                if (uploadError) throw uploadError
+                    if (uploadError) throw uploadError
 
-                const { data: { publicUrl } } = supabase.storage
-                    .from('post-images')
-                    .getPublicUrl(filePath)
+                    const { data: { publicUrl } } = supabase.storage
+                        .from('post-images')
+                        .getPublicUrl(filePath)
 
-                imageUrl = publicUrl
+                    mediaArray.push({
+                        url: publicUrl,
+                        type: media.type
+                    })
+
+                    // Set first media as image_url for backward compatibility
+                    if (!imageUrl && media.type === 'image') {
+                        imageUrl = publicUrl
+                    }
+                }
             }
 
             const pollData = showPollCreator && pollOptions.filter(opt => opt.trim()).length >= 2 ? {
@@ -140,14 +184,16 @@ export function CreatePost() {
                 expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
             } : null
 
-            const mediaType = imageFile?.type?.startsWith('video') ? 'video' : 'image'
+            const hasVideo = mediaArray.some(m => m.type === 'video')
 
             const { data: newPost, error } = await supabase.from('posts').insert({
                 user_id: activeUserId,
                 content,
-                image_url: imageUrl,
+                image_url: imageUrl, // Backward compatibility
+                media: mediaArray.length > 0 ? mediaArray : null, // New column for multiple media
                 poll_data: pollData,
-                media_type: mediaType
+                media_type: hasVideo ? 'video' : (mediaArray.length > 0 ? 'image' : null),
+                has_multiple_media: mediaArray.length > 1
             }).select().single()
 
             if (error) throw error
@@ -168,13 +214,15 @@ export function CreatePost() {
 
             // Reset state
             setContent('')
-            setImageFile(null)
-            setPreviewUrl(null)
+            setMediaFiles([])
             setShowPollCreator(false)
             setPollOptions(['', ''])
             if (fileInputRef.current) fileInputRef.current.value = ''
         } catch (error) {
             console.error('Error posting:', error)
+            if (error instanceof Error) {
+                console.error('Error details:', error.message)
+            }
             alert('Gönderi paylaşılırken bir hata oluştu.')
         } finally {
             setIsPosting(false)
@@ -218,23 +266,42 @@ export function CreatePost() {
                         />
                     )}
 
-                    {previewUrl && (
-                        <div className="relative mt-2 mb-4 group/preview">
-                            {imageFile?.type.startsWith('video') ? (
-                                <video src={previewUrl} controls className="rounded-2xl max-h-60 md:max-h-80 w-auto border border-gray-200 dark:border-gray-800 shadow-sm" />
-                            ) : (
-                                <img src={previewUrl} alt="Preview" className="rounded-2xl max-h-60 md:max-h-80 w-auto object-cover border border-gray-200 dark:border-gray-800 shadow-sm" />
+                    {mediaFiles.length > 0 && (
+                        <div className="mt-3 mb-4">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-w-md">
+                                {mediaFiles.map((media, index) => (
+                                    <div key={index} className="relative group/media aspect-square rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-900">
+                                        {media.type === 'video' ? (
+                                            <video
+                                                src={media.previewUrl}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        ) : (
+                                            <img
+                                                src={media.previewUrl}
+                                                alt={`Preview ${index + 1}`}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        )}
+                                        <div className="absolute inset-0 bg-black/0 group-hover/media:bg-black/40 transition-colors" />
+                                        <button
+                                            onClick={() => removeMedia(index)}
+                                            className="absolute top-1 right-1 bg-black/60 hover:bg-black/80 text-white rounded-full p-1 opacity-0 group-hover/media:opacity-100 transition-opacity"
+                                            title="Sil"
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                        <div className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded opacity-0 group-hover/media:opacity-100 transition-opacity">
+                                            {index + 1} / {mediaFiles.length}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            {mediaFiles.length < 10 && (
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                    {mediaFiles.length} / 10 medya
+                                </div>
                             )}
-                            <button
-                                onClick={() => {
-                                    setImageFile(null)
-                                    setPreviewUrl(null)
-                                    if (fileInputRef.current) fileInputRef.current.value = ''
-                                }}
-                                className="absolute top-2 left-2 bg-black/60 text-white rounded-full p-1.5 hover:bg-black/80 transition-colors backdrop-blur-sm opacity-0 group-hover/preview:opacity-100 transition-opacity"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                            </button>
                         </div>
                     )}
 
@@ -292,7 +359,8 @@ export function CreatePost() {
                         <div className="flex gap-0 text-accent">
                             <button
                                 onClick={() => fileInputRef.current?.click()}
-                                className={`p-2 rounded-full transition-colors ${previewUrl ? 'bg-accent/10 text-accent' : 'hover:bg-accent/10 text-accent'}`}
+                                className={`p-2 rounded-full transition-colors ${mediaFiles.length > 0 ? 'bg-accent/10 text-accent' : 'hover:bg-accent/10 text-accent'}`}
+                                disabled={mediaFiles.length >= 10}
                                 title="Fotoğraf/Video Ekle"
                             >
                                 <Image size={20} />
@@ -301,15 +369,15 @@ export function CreatePost() {
                                     ref={fileInputRef}
                                     className="hidden"
                                     accept="image/*,video/*"
+                                    multiple
                                     onChange={handleMediaSelect}
                                 />
                             </button>
                             <button
                                 onClick={() => {
                                     setShowPollCreator(!showPollCreator)
-                                    if (!showPollCreator && previewUrl) {
-                                        setPreviewUrl(null)
-                                        setImageFile(null)
+                                    if (!showPollCreator && mediaFiles.length > 0) {
+                                        setMediaFiles([])
                                     }
                                 }}
                                 className={`p-2 rounded-full transition-colors ${showPollCreator ? 'bg-accent/10 text-accent' : 'hover:bg-accent/10 text-accent'}`}
@@ -320,7 +388,7 @@ export function CreatePost() {
                         </div>
                         <button
                             onClick={handlePost}
-                            disabled={isPosting || (!content.trim() && !imageFile && !showPollCreator)}
+                            disabled={isPosting || (!content.trim() && mediaFiles.length === 0 && !showPollCreator)}
                             className="bg-accent text-white px-6 py-2 rounded-full font-bold hover:opacity-90 disabled:opacity-50 transition-all active:scale-95 shadow-lg shadow-accent/20"
                         >
                             {isPosting ? '...' : 'Gönder'}

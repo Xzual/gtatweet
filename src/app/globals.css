@@ -50,3 +50,71 @@ body {
   --foreground: #e7e9ea;
   --border: #2f3336;
 }
+
+/* Swiper styles for dark mode compatibility */
+.swiper-pagination-bullet {
+  background-color: rgba(255, 255, 255, 0.4);
+  opacity: 1;
+}
+
+.swiper-pagination-bullet.swiper-pagination-bullet-active {
+  background-color: rgba(255, 255, 255, 0.9);
+}
+
+/* Light mode pagination */
+.light .swiper-pagination-bullet {
+  background-color: rgba(0, 0, 0, 0.4);
+}
+
+.light .swiper-pagination-bullet.swiper-pagination-bullet-active {
+  background-color: rgba(0, 0, 0, 0.9);
+}
+
+/* Ensure pagination container has proper positioning */
+.swiper-pagination {
+  position: relative;
+  bottom: 0 !important;
+  padding: 12px 0 4px 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.3), transparent);
+}
+
+.dark .swiper-pagination {
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.4), transparent);
+}
+
+/* Navigation buttons styling */
+.swiper-button-next,
+.swiper-button-prev {
+  color: white;
+  width: 44px;
+  height: 44px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.swiper-button-next:hover,
+.swiper-button-prev:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.swiper-button-next::after,
+.swiper-button-prev::after {
+  font-size: 20px;
+}
+
+/* Ensure proper aspect ratio for carousel */
+.swiper {
+  width: 100%;
+  height: auto;
+  max-height: 600px;
+}
+
+.swiper-slide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: auto;
+  min-height: 300px;
+}

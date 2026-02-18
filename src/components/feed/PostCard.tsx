@@ -12,6 +12,7 @@ import { UserSelector } from './UserSelector'
 import SeenIndicator from './SeenIndicator'
 import { fetchMentionSuggestions, MentionUser } from '@/utils/mentions'
 import { VerifiedBadge } from '../common/VerifiedBadge'
+import { MediaCarousel } from './MediaCarousel'
 
 const getYouTubeId = (url: string) => {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/
@@ -462,7 +463,16 @@ export function PostCard({ post }: PostProps) {
                             ></iframe>
                         </div>
                     )}
-                    {(post as any).image_url && (
+                    
+                    {/* Display multiple media with carousel */}
+                    {(post as any).media && Array.isArray((post as any).media) && (post as any).media.length > 0 && (
+                        <MediaCarousel 
+                            mediaItems={(post as any).media}
+                        />
+                    )}
+                    
+                    {/* Fallback for old single media format */}
+                    {!(post as any).media && (post as any).image_url && (
                         <div className="mt-3" onClick={(e) => e.stopPropagation()}>
                             <div className="max-w-full rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-900 shadow-sm">
                                 {post.media_type === 'video' ? (
