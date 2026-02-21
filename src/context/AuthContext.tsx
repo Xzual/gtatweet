@@ -32,10 +32,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setSession(session)
             setUser(session?.user ?? null)
             setLoading(false)
+
             if (_event === 'SIGNED_OUT') {
                 setIsAiMode(false)
                 localStorage.removeItem('ai_mode')
                 router.refresh()
+            }
+
+            if (_event === 'PASSWORD_RECOVERY') {
+                router.push('/reset-password')
             }
         })
 
