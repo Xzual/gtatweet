@@ -22,6 +22,17 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
     const [location, setLocation] = useState(profile.location || '')
     const [website, setWebsite] = useState(profile.website || '')
     const [accentColor, setAccentColor] = useState(profile.accent_color || '#3b82f6')
+
+    const formatCount = (count: number) => {
+        if (count >= 1000000) {
+            return (count / 1000000).toFixed(1).replace('.0', '') + 'M'
+        }
+        if (count >= 1000) {
+            return (count / 1000).toFixed(1).replace('.0', '') + 'K'
+        }
+        return count.toString()
+    }
+
     const [profileSongUrl, setProfileSongUrl] = useState(profile.profile_song_url || '')
     const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url)
     const [coverUrl, setCoverUrl] = useState(profile.cover_url)
@@ -106,11 +117,16 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
                 .select('following_id', { count: 'exact', head: true })
                 .eq('follower_id', profile.id)
 
-            setFollowersCount(followers || 0)
+            // Special case for Xzual (Mercedes-AMG F1) as requested by the user
+            if (profile.username === 'Xzual') {
+                setFollowersCount(5200000) // This will be formatted in the UI
+            } else {
+                setFollowersCount(followers || 0)
+            }
             setFollowingCount(following || 0)
         }
         fetchFollowData()
-    }, [profile.id])
+    }, [profile.id, profile.username])
 
     const handleSave = async () => {
         try {
@@ -266,7 +282,7 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
         <div>
             {/* Audio player (hidden) */}
             <audio ref={audioRef} onEnded={() => setIsPlaying(false)} />
-            
+
             {/* Cover Image */}
             <div
                 className="h-48 bg-gray-200 dark:bg-gray-800 w-full relative bg-cover bg-center group/cover"
@@ -536,11 +552,11 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
 
                     <div className="flex gap-4 mt-4">
                         <div className="flex gap-1 hover:underline cursor-pointer">
-                            <span className="font-bold text-black dark:text-white">{followingCount}</span>
+                            <span className="font-bold text-black dark:text-white">{formatCount(followingCount)}</span>
                             <span className="text-gray-500">Takip edilen</span>
                         </div>
                         <div className="flex gap-1 hover:underline cursor-pointer">
-                            <span className="font-bold text-black dark:text-white">{followersCount}</span>
+                            <span className="font-bold text-black dark:text-white">{formatCount(followersCount)}</span>
                             <span className="text-gray-500">Takipçi</span>
                         </div>
                     </div>

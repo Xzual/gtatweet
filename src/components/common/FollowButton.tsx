@@ -14,6 +14,8 @@ export function FollowButton({ targetId, variant = 'sidebar', onToggle }: Follow
     const { user } = useAuth()
     const [isFollowing, setIsFollowing] = useState(false)
     const [loading, setLoading] = useState(true)
+    const SPECIAL_USER_ID = 'bc867c59-e8bc-4000-9c28-5ad02f51d1e5' // Xzual
+    const isSpecialUser = targetId === SPECIAL_USER_ID
 
     useEffect(() => {
         if (!user || !targetId) return
@@ -25,7 +27,9 @@ export function FollowButton({ targetId, variant = 'sidebar', onToggle }: Follow
                 .eq('follower_id', user.id)
                 .eq('following_id', targetId)
                 .single()
-            setIsFollowing(!!data)
+
+            // If it's the special user, they are always followed
+            setIsFollowing(isSpecialUser ? true : !!data)
             setLoading(false)
         }
 
@@ -67,6 +71,12 @@ export function FollowButton({ targetId, variant = 'sidebar', onToggle }: Follow
         e.preventDefault()
         e.stopPropagation()
         if (!user || loading) return
+
+        // Prevent unfollowing special user
+        if (isSpecialUser && isFollowing) {
+            alert('Bu hesabı takipten çıkamazsınız!')
+            return
+        }
 
         const newIsFollowing = !isFollowing
         // Optimistic update
