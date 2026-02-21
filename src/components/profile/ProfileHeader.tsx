@@ -22,6 +22,9 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
     const [location, setLocation] = useState(profile.location || '')
     const [website, setWebsite] = useState(profile.website || '')
     const [accentColor, setAccentColor] = useState(profile.accent_color || '#3b82f6')
+    const [email, setEmail] = useState(user?.email || '')
+    const [newEmail, setNewEmail] = useState('')
+    const [showSecurity, setShowSecurity] = useState(false)
 
     const formatCount = (count: number) => {
         if (count >= 1000000) {
@@ -155,11 +158,17 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
                 return
             }
 
+            if (newEmail && newEmail !== user?.email) {
+                const { error: emailError } = await supabase.auth.updateUser({ email: newEmail })
+                if (emailError) throw emailError
+                alert('E-posta değişim isteği gönderildi. Lütfen yeni e-postanızı kontrol edin.')
+            }
+
             setIsEditing(false)
             router.refresh()
         } catch (err) {
             console.error('Unexpected error while saving profile:', err)
-            alert('Profil kaydedilirken beklenmeyen bir hata oluştu.')
+            alert('Profil kaydedilirken bir hata oluştu: ' + (err instanceof Error ? err.message : 'Bilinmeyen hata'))
         } finally {
             setIsSaving(false)
         }
@@ -486,6 +495,42 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
                                         )}
                                     </div>
                                 </div>
+                            </div>
+
+                            <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSecurity(!showSecurity)}
+                                    className="text-sm font-bold text-gray-500 hover:text-blue-500 flex items-center gap-2"
+                                >
+                                    <Edit2 size={14} /> Hesap ve Güvenlik Ayarları
+                                </button>
+
+                                {showSecurity && (
+                                    <div className="mt-4 space-y-4 bg-gray-50 dark:bg-gray-900/50 p-4 rounded-2xl border border-gray-100 dark:border-gray-800">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-gray-400 uppercase">E-posta Adresini Değiştir</label>
+                                            <input
+                                                type="email"
+                                                value={newEmail}
+                                                onChange={(e) => setNewEmail(e.target.value)}
+                                                placeholder={user?.email || 'yeni@email.com'}
+                                                className="w-full bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl px-4 py-2 text-sm focus:border-accent outline-none"
+                                            />
+                                            <p className="text-[10px] text-gray-500 italic">Değişiklik için her iki e-postaya da onay linki gönderilecektir.</p>
+                                        </div>
+
+                                        <div className="pt-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => router.push('/forgot-password')}
+                                                className="text-xs font-bold text-red-500 hover:underline"
+                                            >
+                                                Şifremi Sıfırla / Değiştir
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ) : (
