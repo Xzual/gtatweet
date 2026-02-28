@@ -30,6 +30,7 @@ export const metadata: Metadata = {
 
 import { PresenceProvider } from "@/context/PresenceContext";
 import { NotificationProvider } from "@/context/NotificationContext";
+import { AuthRedirect } from "@/components/layout/AuthRedirect";
 
 export default function RootLayout({
   children,
@@ -43,19 +44,21 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <AuthProvider>
-          <PresenceProvider>
-            <NotificationProvider>
-              <DynamicTheme />
-              <div className="min-h-screen flex w-full pb-20 md:pb-0">
-                <Sidebar />
-                <main className="flex-1 ml-0 md:ml-20 lg:ml-64 border-r border-gray-200 dark:border-gray-800 min-h-screen">
-                  {children}
-                </main>
-                <RightSidebar />
-                <MobileNav />
-              </div>
-            </NotificationProvider>
-          </PresenceProvider>
+          <AuthRedirect>
+            <PresenceProvider>
+              <NotificationProvider>
+                <DynamicTheme />
+                <div className="min-h-screen flex w-full pb-20 md:pb-0">
+                  <Sidebar />
+                  <main className="flex-1 ml-0 md:ml-20 lg:ml-64 border-r border-gray-200 dark:border-gray-800 min-h-screen mb-20 md:mb-0">
+                    {children}
+                  </main>
+                  <RightSidebar />
+                  <MobileNav />
+                </div>
+              </NotificationProvider>
+            </PresenceProvider>
+          </AuthRedirect>
         </AuthProvider>
       </body>
     </html>

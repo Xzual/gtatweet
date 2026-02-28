@@ -1,3 +1,6 @@
+-- Enable uuid-ossp extension if not exists
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 -- 1. Bildirim Sistemi (Notifications)
 DO $$ BEGIN
     CREATE TYPE notification_type AS ENUM ('like', 'retweet', 'reply', 'follow', 'mention', 'bounty', 'crew_invite');
@@ -7,8 +10,8 @@ END $$;
 
 CREATE TABLE IF NOT EXISTS public.notifications (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE, -- Bildirimi alan
-    actor_id UUID REFERENCES auth.users(id) ON DELETE CASCADE, -- Bildirimi tetikleyen (beğenen vb)
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE, -- Bildirimi alan
+    actor_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE, -- Bildirimi tetikleyen (beğenen vb)
     type notification_type NOT NULL,
     post_id UUID REFERENCES public.posts(id) ON DELETE CASCADE, -- İsteğe bağlı
     comment_id UUID REFERENCES public.comments(id) ON DELETE CASCADE, -- İsteğe bağlı
@@ -31,7 +34,7 @@ CREATE TABLE IF NOT EXISTS public.crews (
     name TEXT NOT NULL UNIQUE,
     tag TEXT NOT NULL UNIQUE, -- Örn: GROVE, BALLAS
     description TEXT,
-    owner_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    owner_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
     avatar_url TEXT,
     banner_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
@@ -39,7 +42,7 @@ CREATE TABLE IF NOT EXISTS public.crews (
 
 CREATE TABLE IF NOT EXISTS public.crew_members (
     crew_id UUID REFERENCES public.crews(id) ON DELETE CASCADE,
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
     role TEXT DEFAULT 'member' CHECK (role IN ('owner', 'admin', 'member')),
     joined_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     PRIMARY KEY (crew_id, user_id)
@@ -65,8 +68,8 @@ CREATE POLICY "Users can leave crews" ON public.crew_members FOR DELETE USING (a
 -- 3. Bounty Sistemi (Ödül Avcılığı)
 CREATE TABLE IF NOT EXISTS public.bounties (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    sender_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-    receiver_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    sender_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    receiver_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
     post_id UUID REFERENCES public.posts(id) ON DELETE CASCADE,
     amount INTEGER NOT NULL CHECK (amount > 0),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
@@ -101,7 +104,7 @@ CREATE TABLE IF NOT EXISTS public.poll_options (
 
 CREATE TABLE IF NOT EXISTS public.poll_votes (
     poll_option_id UUID REFERENCES public.poll_options(id) ON DELETE CASCADE,
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     PRIMARY KEY (poll_option_id, user_id)
 );
@@ -127,7 +130,7 @@ CREATE POLICY "Users can vote" ON public.poll_votes FOR INSERT WITH CHECK (auth.
 -- 7. Hikayeler (Stories / Fleets)
 CREATE TABLE IF NOT EXISTS public.stories (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
     media_url TEXT,
     content TEXT,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,

@@ -23,15 +23,16 @@ export default function CrewsPage() {
                 .from('crews')
                 .select(`
                     *,
-                    owner:profiles!owner_id(username, display_name),
+                    owner:profiles(username, display_name),
                     members:crew_members(count)
                 `)
                 .order('created_at', { ascending: false })
 
             if (error) throw error
             if (data) setCrews(data)
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error fetching crews:', error)
+            alert('Çeteler yüklenirken hata oluştu: ' + (error?.message || 'Bilinmeyen hata'))
         } finally {
             setIsLoading(false)
         }

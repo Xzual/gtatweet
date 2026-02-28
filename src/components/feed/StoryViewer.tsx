@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, Trash2, Heart, Eye } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { tr } from 'date-fns/locale'
 import { useAuth } from '@/context/AuthContext'
@@ -11,14 +11,18 @@ interface StoryViewerProps {
     users: any[]
     initialUserIndex: number
     onClose: () => void
+    onRefresh?: () => void
 }
 
-export function StoryViewer({ users, initialUserIndex, onClose }: StoryViewerProps) {
+export function StoryViewer({ users, initialUserIndex, onClose, onRefresh }: StoryViewerProps) {
     const { user: currentUser } = useAuth()
     const [currentUserIndex, setCurrentUserIndex] = useState(initialUserIndex)
     const [currentStoryIndex, setCurrentStoryIndex] = useState(0)
     const [isPaused, setIsPaused] = useState(false)
     const [progress, setProgress] = useState(0)
+    const [likesCount, setLikesCount] = useState(0)
+    const [viewsCount, setViewsCount] = useState(0)
+    const [hasLiked, setHasLiked] = useState(false)
 
     const activeUser = users[currentUserIndex]
     const activeStory = activeUser?.stories[currentStoryIndex]
@@ -34,8 +38,7 @@ export function StoryViewer({ users, initialUserIndex, onClose }: StoryViewerPro
         const timer = setInterval(() => {
             setProgress(prev => {
                 if (prev + step >= 100) {
-                    handleNextStory()
-                    return 0
+                    return 100 // Mark as complete
                 }
                 return prev + step
             })
@@ -44,10 +47,90 @@ export function StoryViewer({ users, initialUserIndex, onClose }: StoryViewerPro
         return () => clearInterval(timer)
     }, [currentStoryIndex, currentUserIndex, isPaused, activeStory])
 
+    // Watch for progress completion to trigger next story
+    useEffect(() => {
+        if (progress >= 100) {
+            handleNextStory()
+        }
+    }, [progress])
+
     // Reset progress when changing story
     useEffect(() => {
         setProgress(0)
+        if (activeStory) {
+            fetchInteractions()
+            recordView()
+        }
     }, [currentStoryIndex, currentUserIndex])
+
+    const fetchInteractions = async () => {
+        if (!activeStory) return
+
+        // Fetch likes
+        const { count: likes, error: likesError } = await supabase
+            .from('story_likes')
+            .select('*', { count: 'exact', head: true })
+            .eq('story_id', activeStory.id)
+
+        // Check if current user liked
+        if (currentUser) {
+            const { data: myLike } = await supabase
+                .from('story_likes')
+                .select('id')
+                .eq('story_id', activeStory.id)
+                .eq('user_id', currentUser.id)
+                .maybeSingle()
+            setHasLiked(!!myLike)
+        }
+
+        // Fetch views (exact count)
+        const { count: views } = await supabase
+            .from('story_views')
+            .select('*', { count: 'exact', head: true })
+            .eq('story_id', activeStory.id)
+
+        if (!likesError) setLikesCount(likes || 0)
+        setViewsCount(views || 0)
+    }
+
+    const recordView = async () => {
+        if (!currentUser || !activeStory || currentUser.id === activeStory.user_id) return
+
+        await supabase
+            .from('story_views')
+            .insert({
+                story_id: activeStory.id,
+                user_id: currentUser.id
+            })
+        // Ignore error if already viewed (unique constraint)
+    }
+
+    const handleLike = async () => {
+        if (!currentUser || !activeStory) return
+
+        try {
+            if (hasLiked) {
+                await supabase
+                    .from('story_likes')
+                    .delete()
+                    .eq('story_id', activeStory.id)
+                    .eq('user_id', currentUser.id)
+                setHasLiked(false)
+                setLikesCount(prev => Math.max(0, prev - 1))
+            } else {
+                await supabase
+                    .from('story_likes')
+                    .insert({
+                        story_id: activeStory.id,
+                        user_id: currentUser.id
+                    })
+                setHasLiked(true)
+                setLikesCount(prev => prev + 1)
+            }
+        } catch (error) {
+            console.error('Error toggling story like:', error)
+        }
+    }
 
     const handleNextStory = () => {
         if (currentStoryIndex < activeUser.stories.length - 1) {
@@ -81,34 +164,29 @@ export function StoryViewer({ users, initialUserIndex, onClose }: StoryViewerPro
         if (!confirm('Hikayeyi silmek istediğinize emin misiniz?')) return
 
         setIsPaused(true)
+        console.log('Attempting to delete story:', activeStory.id, 'by user:', currentUser?.id)
         try {
-            await supabase.from('stories').delete().eq('id', activeStory.id)
+            const { error } = await supabase.from('stories').delete().eq('id', activeStory.id)
+
+            if (error) throw error
 
             // Remove from local state visually for immediate feedback
             activeUser.stories.splice(currentStoryIndex, 1)
 
             if (activeUser.stories.length === 0) {
-                // If user has no more stories, go to next user or close
-                if (users.length === 1) {
-                    onClose()
-                } else if (currentUserIndex < users.length - 1) {
-                    // Go next
-                    setCurrentUserIndex(prev => prev + 1)
-                    setCurrentStoryIndex(0)
-                } else {
-                    // Was last user, go to previous
-                    setCurrentUserIndex(prev => prev - 1)
-                    setCurrentStoryIndex(users[currentUserIndex - 1].stories.length - 1)
-                }
+                onClose()
             } else {
                 // User still has stories, adjust index
                 if (currentStoryIndex >= activeUser.stories.length) {
                     setCurrentStoryIndex(activeUser.stories.length - 1)
                 }
             }
-        } catch (error) {
+
+            if (onRefresh) onRefresh()
+            alert('Hikaye başarıyla silindi.')
+        } catch (error: any) {
             console.error('Error deleting story:', error)
-            alert('Silinirken hata oluştu.')
+            alert('Silinirken hata oluştu: ' + (error.message || 'Bilinmeyen hata'))
         } finally {
             setIsPaused(false)
         }
@@ -145,7 +223,11 @@ export function StoryViewer({ users, initialUserIndex, onClose }: StoryViewerPro
                 <div className="absolute top-6 inset-x-0 p-4 z-20 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-800">
-                            {activeUser.avatar_url && <img src={activeUser.avatar_url} alt="" className="w-full h-full object-cover" />}
+                            <img
+                                src={activeUser.avatar_url || `https://ui-avatars.com/api/?name=${activeUser.username}&background=random`}
+                                alt=""
+                                className="w-full h-full object-cover"
+                            />
                         </div>
                         <span className="text-white font-bold text-sm drop-shadow-md">{activeUser.username}</span>
                         <span className="text-white/70 text-xs drop-shadow-md">
@@ -154,6 +236,20 @@ export function StoryViewer({ users, initialUserIndex, onClose }: StoryViewerPro
                     </div>
 
                     <div className="flex items-center gap-2">
+                        {/* Likes Count */}
+                        <div className="flex items-center gap-1 text-white/90 bg-black/20 px-2 py-1 rounded-full backdrop-blur-sm">
+                            <Heart size={14} className={hasLiked ? "fill-red-500 text-red-500" : ""} />
+                            <span className="text-xs font-bold">{likesCount}</span>
+                        </div>
+
+                        {/* Views Count (Story Owner Only) */}
+                        {currentUser?.id === activeStory.user_id && (
+                            <div className="flex items-center gap-1 text-white/90 bg-black/20 px-2 py-1 rounded-full backdrop-blur-sm">
+                                <Eye size={14} />
+                                <span className="text-xs font-bold">{viewsCount}</span>
+                            </div>
+                        )}
+
                         {currentUser?.id === activeStory.user_id && (
                             <button
                                 onClick={handleDelete}
@@ -180,7 +276,7 @@ export function StoryViewer({ users, initialUserIndex, onClose }: StoryViewerPro
                         <div className="w-full h-full bg-black flex flex-col items-center justify-center">
                             <img src={activeStory.media_url} alt="Story" className="w-full h-full object-contain" />
                             {activeStory.content && (
-                                <div className="absolute bottom-16 inset-x-8 text-center text-white bg-black/60 p-4 rounded-2xl backdrop-blur-sm">
+                                <div className="absolute bottom-24 inset-x-8 text-center text-white bg-black/60 p-4 rounded-2xl backdrop-blur-sm">
                                     <p className="text-lg font-medium">{activeStory.content}</p>
                                 </div>
                             )}
@@ -192,6 +288,20 @@ export function StoryViewer({ users, initialUserIndex, onClose }: StoryViewerPro
                             </p>
                         </div>
                     )}
+                </div>
+
+                {/* Footer Actions */}
+                <div className="absolute bottom-6 inset-x-0 px-6 z-30 flex justify-center">
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            handleLike()
+                        }}
+                        className={`p-4 rounded-full backdrop-blur-md border border-white/20 transition-all ${hasLiked ? 'bg-red-500/20 text-red-500 border-red-500/50 scale-110' : 'bg-white/10 text-white hover:bg-white/20'
+                            }`}
+                    >
+                        <Heart size={28} className={hasLiked ? "fill-current" : ""} />
+                    </button>
                 </div>
 
                 {/* Touch Navigation Overlay */}
