@@ -118,3 +118,16 @@ body {
   height: auto;
   min-height: 300px;
 }
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.min-h-screen-safe {
+  min-height: -webkit-fill-available;
+}
+
+html, body {
+  height: 100%;
+}
+

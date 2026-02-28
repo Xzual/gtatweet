@@ -12,8 +12,10 @@ export function AuthRedirect({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (!loading && !user) {
             // List of allowed public pages
-            const publicPages = ['/login', '/register', '/forgot-password', '/reset-password']
-            if (!publicPages.includes(pathname)) {
+            const publicPathnames = ['/login', '/register', '/forgot-password', '/reset-password']
+            const isPublicPage = publicPathnames.some(path => pathname === path || pathname.startsWith(path + '/'))
+
+            if (!isPublicPage) {
                 router.push('/login')
             }
         }

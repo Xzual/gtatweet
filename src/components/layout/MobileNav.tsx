@@ -14,7 +14,7 @@ export function MobileNav() {
     if (!user) return null
 
     return (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-black/95 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 z-50 flex justify-around items-center px-2 py-3 pb-8 h-20 shadow-2xl">
+        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-black/95 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 z-[9999] flex justify-around items-center px-1 py-2 pb-safe min-h-[70px] shadow-[0_-4px_16px_rgba(0,0,0,0.1)] dark:shadow-[0_-4px_16px_rgba(0,0,0,0.5)]">
             <Link href="/" className={`p-1.5 rounded-full transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-900 active:scale-90 ${pathname === '/' ? 'text-accent' : 'text-gray-500'}`}>
                 <Home size={24} strokeWidth={pathname === '/' ? 3 : 2} />
             </Link>
