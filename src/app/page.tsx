@@ -6,6 +6,7 @@ import { CreatePost } from '@/components/feed/CreatePost'
 import { PostCard } from '@/components/feed/PostCard'
 import { useAuth } from '@/context/AuthContext'
 import Link from 'next/link'
+import { StoriesBar } from '@/components/feed/StoriesBar'
 
 export default function Home() {
   const [posts, setPosts] = useState<any[]>([])
@@ -103,9 +104,11 @@ export default function Home() {
 
   return (
     <div className="flex flex-col">
-      <header className="sticky top-0 bg-white/80 dark:bg-black/80 backdrop-blur-md p-4 border-b border-gray-200 dark:border-gray-800 z-10">
+      <header className="sticky top-0 bg-white/80 dark:bg-black/80 backdrop-blur-md p-4 border-b border-gray-200 dark:border-gray-800 z-10 flex items-center justify-between">
         <h1 className="text-xl font-bold">Home</h1>
       </header>
+
+      {user && <StoriesBar />}
 
       {user && <CreatePost />}
 

@@ -89,6 +89,15 @@ export function FollowButton({ targetId, variant = 'sidebar', onToggle }: Follow
                     following_id: targetId
                 })
                 if (error) throw error
+
+                // Bildirim gönder
+                if (targetId !== user.id) {
+                    await supabase.from('notifications').insert({
+                        user_id: targetId,
+                        actor_id: user.id,
+                        type: 'follow'
+                    })
+                }
             } else {
                 const { error } = await supabase.from('follows').delete().match({
                     follower_id: user.id,

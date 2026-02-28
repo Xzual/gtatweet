@@ -29,6 +29,7 @@ export const metadata: Metadata = {
 };
 
 import { PresenceProvider } from "@/context/PresenceContext";
+import { NotificationProvider } from "@/context/NotificationContext";
 
 export default function RootLayout({
   children,
@@ -36,22 +37,24 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white dark:bg-black text-black dark:text-white`}
         suppressHydrationWarning
       >
         <AuthProvider>
           <PresenceProvider>
-            <DynamicTheme />
-            <div className="min-h-screen flex w-full pb-20 md:pb-0">
-              <Sidebar />
-              <main className="flex-1 ml-0 md:ml-20 lg:ml-64 border-r border-gray-200 dark:border-gray-800 min-h-screen">
-                {children}
-              </main>
-              <RightSidebar />
-              <MobileNav />
-            </div>
+            <NotificationProvider>
+              <DynamicTheme />
+              <div className="min-h-screen flex w-full pb-20 md:pb-0">
+                <Sidebar />
+                <main className="flex-1 ml-0 md:ml-20 lg:ml-64 border-r border-gray-200 dark:border-gray-800 min-h-screen">
+                  {children}
+                </main>
+                <RightSidebar />
+                <MobileNav />
+              </div>
+            </NotificationProvider>
           </PresenceProvider>
         </AuthProvider>
       </body>

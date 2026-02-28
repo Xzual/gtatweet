@@ -35,16 +35,24 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'AI servisi yapılandırılmamış (GROQ_API_KEY eksik).' }, { status: 500 })
         }
 
-                // Use default system prompt (AI system prompt feature removed)
-                let systemPrompt = DEFAULT_SYSTEM_PROMPT
+        // Command detection
+        const isSummarize = content.toLowerCase().includes('özetle')
+        const isMeme = content.toLowerCase().includes('meme')
 
-        // Call Groq AI (OpenAI compatible)
+        let systemPrompt = DEFAULT_SYSTEM_PROMPT
         let prompt = `Aşağıdaki sosyal medya gönderisine kısa, zekice, biraz alaycı ve eğlenceli bir yorum yap. 
         Karakterin: GTATweet AI Botu. 
         Maksimum 280 karakter olsun. 
         Gönderi: "${content}"`
 
-        if (replyToUsername) {
+        if (isSummarize) {
+            prompt = `Aşağıdaki metni çok kısa, net ve GTA sokak ağzıyla özetle. Uzatma, sadede gel. Metin: "${content}"`
+        } else if (isMeme) {
+            systemPrompt = "Sen bir meme üreteci botusun. Sadece geçerli bir JSON objesi döndür. Başka hiçbir açıklama yapma."
+            prompt = `Şu konuya uygun komik bir internet caps/meme metni yaz. 
+            Format: {"top": "ÜST METİN", "bottom": "ALT METİN"}
+            İçerik: "${content}"`
+        } else if (replyToUsername) {
             prompt = `Kullanıcı (@${replyToUsername}) seninle konuştu veya seni etiketledi. Ona kısa, zekice ve alaycı bir cevap ver. Konuştuğu metin: "${content}". Karakterin: GTATweet AI Botu.`
         }
 
@@ -60,14 +68,26 @@ export async function POST(req: Request) {
                     { role: "system", content: systemPrompt },
                     { role: "user", content: prompt }
                 ],
-                max_tokens: 150
+                max_tokens: 150,
+                response_format: isMeme ? { type: "json_object" } : undefined
             })
         })
 
         const aiData = await aiResponse.json()
         let botComment = aiData.choices?.[0]?.message?.content || "Vay canına, ne diyeceğimi bilemedim!"
 
-        if (replyToUsername) {
+        if (isMeme) {
+            try {
+                const memeData = JSON.parse(botComment)
+                const topText = encodeURIComponent(memeData.top || 'GTA').replace(/-/g, '--').replace(/_/g, '__')
+                const bottomText = encodeURIComponent(memeData.bottom || 'VIBES').replace(/-/g, '--').replace(/_/g, '__')
+                // Use a simple template from memegen
+                botComment = `[IMAGE:https://api.memegen.link/images/buzz/${topText}/${bottomText}.jpg]`
+            } catch (e) {
+                console.error("Meme JSON parse error", e)
+                botComment = "Meme jeneratörü bozuldu, Los Santos gümrüğüne götürüyorum."
+            }
+        } else if (replyToUsername && !isSummarize) {
             botComment = `@${replyToUsername} ${botComment}`
         }
 

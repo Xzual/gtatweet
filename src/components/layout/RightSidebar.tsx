@@ -13,18 +13,38 @@ import { usePresence } from '@/context/PresenceContext'
 export function RightSidebar() {
     const { user } = useAuth()
     const { onlineUsers } = usePresence()
-    const [trends, setTrends] = useState<any[]>([])
+    const [trendingTags, setTrendingTags] = useState<{ tag: string, count: number }[]>([])
     const [suggestions, setSuggestions] = useState<any[]>([])
     const [isSearchFocused, setIsSearchFocused] = useState(false)
 
     useEffect(() => {
         const fetchTrends = async () => {
-            const { data } = await supabase
+            const { data: recentPosts } = await supabase
                 .from('posts')
-                .select('*, profiles(*)')
+                .select('content')
                 .order('created_at', { ascending: false })
-                .limit(4)
-            if (data) setTrends(data)
+                .limit(100)
+
+            if (recentPosts) {
+                const hashtagCounts: Record<string, number> = {}
+                recentPosts.forEach(post => {
+                    // Match hashtags including Turkish characters
+                    const matches = post.content.match(/#[\wığüşöçIĞÜŞÖÇ]+/g)
+                    if (matches) {
+                        matches.forEach((tag: string) => {
+                            const cleanTag = tag.toLowerCase()
+                            hashtagCounts[cleanTag] = (hashtagCounts[cleanTag] || 0) + 1
+                        })
+                    }
+                })
+
+                const sortedTrends = Object.entries(hashtagCounts)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 5)
+                    .map(([tag, count]) => ({ tag, count }))
+
+                setTrendingTags(sortedTrends)
+            }
         }
 
         fetchTrends()
@@ -36,24 +56,15 @@ export function RightSidebar() {
                 event: 'INSERT',
                 schema: 'public',
                 table: 'posts'
-            }, async (payload) => {
-                // Fetch the new post with profile info
-                const { data: newPost } = await supabase
-                    .from('posts')
-                    .select('*, profiles(*)')
-                    .eq('id', payload.new.id)
-                    .single()
-
-                if (newPost) {
-                    setTrends(current => [newPost, ...current].slice(0, 4))
-                }
+            }, () => {
+                fetchTrends()
             })
             .on('postgres_changes', {
                 event: 'DELETE',
                 schema: 'public',
                 table: 'posts'
-            }, (payload) => {
-                fetchTrends() // Re-fetch to keep it at 4
+            }, () => {
+                fetchTrends()
             })
             .subscribe()
 
@@ -149,29 +160,31 @@ export function RightSidebar() {
 
             {/* Trends Section */}
             <div className="bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl overflow-hidden mb-4 shadow-sm">
-                <h2 className="text-xl font-black px-4 pt-4 pb-2">Gündemdekiler</h2>
+                <h2 className="text-xl font-black px-4 pt-4 pb-2">Los Santos Gündemi</h2>
                 <div className="flex flex-col">
-                    {trends.slice(0, 4).map((t, i) => (
-                        <Link
-                            key={i}
-                            href={`/user/${t.profiles.username}`}
-                            className="px-4 py-3 hover:bg-gray-200/50 dark:hover:bg-gray-800 transition-colors group cursor-pointer border-b border-gray-100/50 dark:border-gray-800/50 last:border-0"
-                        >
-                            <div className="flex justify-between items-start">
-                                <div className="text-[13px] text-gray-500">{i + 1}. sırada gündem</div>
-                                <div className="text-gray-400 group-hover:text-blue-500 transition-colors">
-                                    <span className="text-lg font-bold leading-none">···</span>
+                    {trendingTags.length === 0 ? (
+                        <div className="text-[14px] text-gray-500 px-4 py-4 italic">Şu an gündemde bir şey yok.</div>
+                    ) : (
+                        trendingTags.map((t, i) => (
+                            <div
+                                key={i}
+                                className="px-4 py-3 hover:bg-gray-200/50 dark:hover:bg-gray-800 transition-colors group cursor-pointer border-b border-gray-100/50 dark:border-gray-800/50 last:border-0"
+                            >
+                                <div className="flex justify-between items-start">
+                                    <div className="text-[13px] text-gray-500">{i + 1}. sırada gündem</div>
+                                    <div className="text-gray-400 group-hover:text-blue-500 transition-colors">
+                                        <span className="text-lg font-bold leading-none">···</span>
+                                    </div>
+                                </div>
+                                <div className="font-bold text-[15px] mt-0.5 leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                                    {t.tag}
+                                </div>
+                                <div className="flex items-center gap-1 mt-1">
+                                    <div className="text-[13px] text-gray-500">{t.count} gönderi</div>
                                 </div>
                             </div>
-                            <div className="font-bold text-[15px] mt-0.5 leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400">
-                                {t.content.substring(0, 45)}{t.content.length > 45 ? '...' : ''}
-                            </div>
-                            <div className="flex items-center gap-1 mt-1">
-                                <div className="text-[13px] text-gray-500">@{t.profiles.username}</div>
-                                <VerifiedBadge size={12} />
-                            </div>
-                        </Link>
-                    ))}
+                        ))
+                    )}
                 </div>
             </div>
 

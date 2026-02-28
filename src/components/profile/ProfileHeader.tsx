@@ -54,6 +54,9 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
     const [followersCount, setFollowersCount] = useState(0)
     const [followingCount, setFollowingCount] = useState(0)
 
+    // Crew state
+    const [activeCrew, setActiveCrew] = useState<any>(null)
+
     useEffect(() => {
         setDisplayName(profile.display_name)
         setBio(profile.bio || '')
@@ -127,6 +130,17 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
                 setFollowersCount(followers || 0)
             }
             setFollowingCount(following || 0)
+
+            // Fetch active crew
+            const { data: crewMemberData } = await supabase
+                .from('crew_members')
+                .select('crews(*)')
+                .eq('user_id', profile.id)
+                .single()
+
+            if (crewMemberData && crewMemberData.crews) {
+                setActiveCrew(crewMemberData.crews)
+            }
         }
         fetchFollowData()
     }, [profile.id, profile.username])
@@ -539,6 +553,15 @@ export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
                                 <h1 className="text-xl font-bold flex items-center gap-1">
                                     {displayName || profile.username}
                                     <VerifiedBadge size={18} />
+                                    {activeCrew && (
+                                        <button
+                                            onClick={() => router.push(`/crews/${activeCrew.tag}`)}
+                                            className="ml-1 text-sm bg-gray-200 dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300 font-mono hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors"
+                                            title={activeCrew.name}
+                                        >
+                                            [{activeCrew.tag}]
+                                        </button>
+                                    )}
                                 </h1>
                                 {profile.username === 'gtatweet_ai' && (
                                     <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider shadow-sm shadow-blue-500/50">

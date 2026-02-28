@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { Home, Search, User, LogOut, Bookmark, Mail, UserPlus, Hash } from 'lucide-react'
+import { Home, Search, User, LogOut, Bookmark, Mail, UserPlus, Bell, Users } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { useNotifications } from '@/context/NotificationContext'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { useState } from 'react'
 import { BugReportModal } from './BugReportModal'
@@ -10,6 +11,7 @@ import { usePathname } from 'next/navigation'
 
 export function Sidebar() {
     const { user, signOut, isAiMode, toggleAiMode } = useAuth()
+    const { unreadCount } = useNotifications()
     const [bugOpen, setBugOpen] = useState(false)
     const MANAGER_ID = 'bc867c59-e8bc-4000-9c28-5ad02f51d1e5'
     const isManager = user?.id === MANAGER_ID || user?.email === 'arda.yorulmazel9@gmail.com'
@@ -17,7 +19,9 @@ export function Sidebar() {
     const menuItems = [
         { icon: Home, label: 'Anasayfa', href: '/' },
         { icon: Search, label: 'Keşfet', href: '/search' },
+        { icon: Bell, label: 'Bildirimler', href: '/notifications', auth: true, badge: unreadCount },
         { icon: Mail, label: 'Mesajlar', href: '/messages', auth: true },
+        { icon: Users, label: 'Çeteler', href: '/crews', auth: true },
         { icon: Bookmark, label: 'Yer İşaretleri', href: '/bookmarks', auth: true },
         { icon: User, label: 'Profil', href: user ? `/user/${user.user_metadata?.username || user.id}` : '/login', auth: true },
     ]
@@ -42,6 +46,7 @@ export function Sidebar() {
                             href={item.href}
                             icon={<item.icon size={28} />}
                             label={item.label}
+                            badge={item.badge}
                         />
                     )
                 })}
@@ -90,16 +95,21 @@ export function Sidebar() {
     )
 }
 
-const NavLink = ({ href, icon, label }: { href: string, icon: React.ReactNode, label: string }) => {
+const NavLink = ({ href, icon, label, badge }: { href: string, icon: React.ReactNode, label: string, badge?: number }) => {
     const pathname = usePathname()
     const isActive = pathname === href
     return (
         <Link
             href={href}
-            className={`flex items-center gap-4 p-3 rounded-full transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-900 group active:scale-95 ${isActive ? 'font-bold text-blue-600' : 'text-gray-700 dark:text-gray-300'}`}
+            className={`flex items-center gap-4 p-3 rounded-full transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-900 group active:scale-95 relative ${isActive ? 'font-bold text-blue-600' : 'text-gray-700 dark:text-gray-300'}`}
         >
-            <div className={`transition-transform duration-200 group-hover:scale-110 ${isActive ? 'scale-110' : ''}`}>
+            <div className={`transition-transform duration-200 group-hover:scale-110 relative ${isActive ? 'scale-110' : ''}`}>
                 {icon}
+                {badge !== undefined && badge > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                        {badge > 9 ? '9+' : badge}
+                    </span>
+                )}
             </div>
             <span className="text-xl hidden lg:block">{label}</span>
         </Link>

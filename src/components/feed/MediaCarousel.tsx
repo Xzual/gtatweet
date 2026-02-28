@@ -10,7 +10,7 @@ import 'swiper/css/pagination'
 
 interface Media {
   url: string
-  type: 'image' | 'video'
+  type: 'image' | 'video' | 'audio' | 'gif'
 }
 
 interface MediaCarouselProps {
@@ -94,6 +94,13 @@ export function MediaCarousel({ mediaItems }: MediaCarouselProps) {
                       className="w-full h-full object-contain"
                       preload="metadata"
                     />
+                  </div>
+                ) : media.type === 'audio' ? (
+                  <div className="flex flex-col items-center justify-center p-8 bg-gray-900 w-full h-full rounded-2xl">
+                    <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mb-4">
+                      <Play size={32} className="text-blue-500" fill="currentColor" />
+                    </div>
+                    <audio src={media.url} controls className="w-full max-w-xs" />
                   </div>
                 ) : (
                   <img

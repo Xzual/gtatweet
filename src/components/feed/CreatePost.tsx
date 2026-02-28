@@ -1,16 +1,17 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Image, AlignLeft, X } from 'lucide-react'
+import { Image, AlignLeft, X, FileImage, Mic, Square } from 'lucide-react'
 import { supabase } from '@/utils/supabase/client'
 import { useAuth } from '@/context/AuthContext'
 import { UserSelector } from './UserSelector'
 import { fetchMentionSuggestions, MentionUser } from '@/utils/mentions'
+import { GifPicker } from '@/components/common/GifPicker'
 
 interface MediaPreview {
-    file: File
+    file?: File
     previewUrl: string
-    type: 'image' | 'video'
+    type: 'image' | 'video' | 'gif' | 'audio'
 }
 
 export function CreatePost() {
@@ -25,6 +26,14 @@ export function CreatePost() {
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
     const [showPollCreator, setShowPollCreator] = useState(false)
     const [pollOptions, setPollOptions] = useState(['', ''])
+    const [showGifPicker, setShowGifPicker] = useState(false)
+
+    // Voice recording state
+    const [isRecording, setIsRecording] = useState(false)
+    const [recordingTime, setRecordingTime] = useState(0)
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+    const audioChunksRef = useRef<Blob[]>([])
+    const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
     // Mentions state
     const [showMentions, setShowMentions] = useState(false)
@@ -110,7 +119,7 @@ export function CreatePost() {
     const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             const newFiles = Array.from(e.target.files)
-            
+
             // Limit to 10 media items per post
             const totalMedia = mediaFiles.length + newFiles.length
             if (totalMedia > 10) {
@@ -121,7 +130,7 @@ export function CreatePost() {
             newFiles.forEach(file => {
                 const previewUrl = URL.createObjectURL(file)
                 const type = file.type.startsWith('video') ? 'video' : 'image'
-                
+
                 setMediaFiles(prev => [...prev, { file, previewUrl, type }])
             })
 
@@ -142,6 +151,49 @@ export function CreatePost() {
         })
     }
 
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+            const mediaRecorder = new MediaRecorder(stream)
+            mediaRecorderRef.current = mediaRecorder
+            audioChunksRef.current = []
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) audioChunksRef.current.push(e.data)
+            }
+
+            mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+                const file = new File([audioBlob], `voice_${Date.now()}.webm`, { type: 'audio/webm' })
+                setMediaFiles(prev => [...prev, {
+                    file,
+                    previewUrl: URL.createObjectURL(audioBlob),
+                    type: 'audio'
+                }])
+                stream.getTracks().forEach(track => track.stop())
+            }
+
+            mediaRecorder.start()
+            setIsRecording(true)
+            setRecordingTime(0)
+
+            recordingIntervalRef.current = setInterval(() => {
+                setRecordingTime(prev => prev + 1)
+            }, 1000)
+        } catch (err) {
+            console.error('Mic access denied:', err)
+            alert('Mikrofon erişimi reddedildi.')
+        }
+    }
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop()
+            setIsRecording(false)
+            if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current)
+        }
+    }
+
     const handlePost = async () => {
         if ((!content.trim() && mediaFiles.length === 0) || !activeUserId) return
 
@@ -153,28 +205,40 @@ export function CreatePost() {
             // Upload all media files
             if (mediaFiles.length > 0) {
                 for (const media of mediaFiles) {
-                    const fileExt = media.file.name.split('.').pop()
-                    const fileName = `${activeUserId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`
-                    const filePath = `${fileName}`
+                    if (media.file) {
+                        const fileExt = media.file.name.split('.').pop()
+                        const fileName = `${activeUserId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`
+                        const filePath = `${fileName}`
 
-                    const { error: uploadError } = await supabase.storage
-                        .from('post-images')
-                        .upload(filePath, media.file)
+                        const { error: uploadError } = await supabase.storage
+                            .from('post-images')
+                            .upload(filePath, media.file)
 
-                    if (uploadError) throw uploadError
+                        if (uploadError) throw uploadError
 
-                    const { data: { publicUrl } } = supabase.storage
-                        .from('post-images')
-                        .getPublicUrl(filePath)
+                        const { data: { publicUrl } } = supabase.storage
+                            .from('post-images')
+                            .getPublicUrl(filePath)
 
-                    mediaArray.push({
-                        url: publicUrl,
-                        type: media.type
-                    })
+                        mediaArray.push({
+                            url: publicUrl,
+                            type: media.type
+                        })
 
-                    // Set first media as image_url for backward compatibility
-                    if (!imageUrl && media.type === 'image') {
-                        imageUrl = publicUrl
+                        // Set first media as image_url for backward compatibility
+                        if (!imageUrl && media.type === 'image') {
+                            imageUrl = publicUrl
+                        }
+                    } else {
+                        // It's a direct URL (like a GIF)
+                        mediaArray.push({
+                            url: media.previewUrl,
+                            type: media.type
+                        })
+
+                        if (!imageUrl && media.type === 'gif') {
+                            imageUrl = media.previewUrl
+                        }
                     }
                 }
             }
@@ -216,6 +280,7 @@ export function CreatePost() {
             setContent('')
             setMediaFiles([])
             setShowPollCreator(false)
+            setShowGifPicker(false)
             setPollOptions(['', ''])
             if (fileInputRef.current) fileInputRef.current.value = ''
         } catch (error) {
@@ -276,6 +341,11 @@ export function CreatePost() {
                                                 src={media.previewUrl}
                                                 className="w-full h-full object-cover"
                                             />
+                                        ) : media.type === 'audio' ? (
+                                            <div className="w-full h-full bg-blue-500/20 flex flex-col items-center justify-center p-2 text-center">
+                                                <Mic className="text-blue-500 mb-1" size={24} />
+                                                <span className="text-[10px] font-bold text-blue-500">Ses Kaydı</span>
+                                            </div>
                                         ) : (
                                             <img
                                                 src={media.previewUrl}
@@ -355,6 +425,16 @@ export function CreatePost() {
                             <span className={`text-[10px] md:text-xs font-medium ${content.length > 260 ? 'text-red-500' : 'text-accent'}`}>{280 - content.length} characters left</span>
                         </div>
                     )}
+
+                    {isRecording && (
+                        <div className="flex items-center gap-2 text-red-500 animate-pulse mb-3 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-2 w-fit">
+                            <div className="w-2 h-2 rounded-full bg-red-500" />
+                            <span className="text-sm font-medium font-mono">
+                                Ses Kaydediliyor: {Math.floor(recordingTime / 60).toString().padStart(2, '0')}:{(recordingTime % 60).toString().padStart(2, '0')}
+                            </span>
+                        </div>
+                    )}
+
                     <div className="flex justify-between items-center mt-1 md:mt-2">
                         <div className="flex gap-0 text-accent">
                             <button
@@ -373,6 +453,27 @@ export function CreatePost() {
                                     onChange={handleMediaSelect}
                                 />
                             </button>
+                            <div className="relative">
+                                <button
+                                    onClick={() => setShowGifPicker(!showGifPicker)}
+                                    className={`p-2 rounded-full transition-colors ${showGifPicker ? 'bg-accent/10 text-accent' : 'hover:bg-accent/10 text-accent'}`}
+                                    disabled={mediaFiles.length >= 10}
+                                    title="GIF Ekle"
+                                >
+                                    <FileImage size={20} />
+                                </button>
+                                {showGifPicker && (
+                                    <div className="absolute top-full left-0 z-50 mt-2">
+                                        <GifPicker
+                                            onClose={() => setShowGifPicker(false)}
+                                            onSelect={(url) => {
+                                                setMediaFiles(prev => [...prev, { previewUrl: url, type: 'gif' }])
+                                                setShowGifPicker(false)
+                                            }}
+                                        />
+                                    </div>
+                                )}
+                            </div>
                             <button
                                 onClick={() => {
                                     setShowPollCreator(!showPollCreator)
@@ -384,6 +485,17 @@ export function CreatePost() {
                                 title="Anket"
                             >
                                 <AlignLeft size={20} />
+                            </button>
+                            <button
+                                type="button"
+                                onPointerDown={startRecording}
+                                onPointerUp={stopRecording}
+                                onPointerLeave={stopRecording}
+                                className={`p-2 rounded-full transition-colors ${isRecording ? 'bg-red-500/10 text-red-500' : 'hover:bg-accent/10 text-accent'}`}
+                                disabled={mediaFiles.length >= 10}
+                                title="Basılı tutarak ses kaydet"
+                            >
+                                {isRecording ? <Square size={20} /> : <Mic size={20} />}
                             </button>
                         </div>
                         <button

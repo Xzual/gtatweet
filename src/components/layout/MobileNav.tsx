@@ -1,12 +1,14 @@
 'use client'
 
 import Link from 'next/link'
-import { Home, Search, User, LogOut, Bookmark, Mail } from 'lucide-react'
+import { Home, Search, User, LogOut, Bookmark, Mail, Bell, Users } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { useNotifications } from '@/context/NotificationContext'
 import { usePathname } from 'next/navigation'
 
 export function MobileNav() {
     const { user, signOut } = useAuth()
+    const { unreadCount } = useNotifications()
     const pathname = usePathname()
 
     if (!user) return null
@@ -25,8 +27,23 @@ export function MobileNav() {
                 <Bookmark size={26} strokeWidth={pathname === '/bookmarks' ? 3 : 2} />
             </Link>
 
+            <Link href="/notifications" className={`p-3 rounded-full transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-900 active:scale-90 relative ${pathname === '/notifications' ? 'text-accent' : 'text-gray-500'}`}>
+                <div className="relative">
+                    <Bell size={26} strokeWidth={pathname === '/notifications' ? 3 : 2} />
+                    {unreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                            {unreadCount > 9 ? '9+' : unreadCount}
+                        </span>
+                    )}
+                </div>
+            </Link>
+
             <Link href="/messages" className={`p-3 rounded-full transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-900 active:scale-90 ${pathname === '/messages' ? 'text-accent' : 'text-gray-500'}`}>
                 <Mail size={26} strokeWidth={pathname === '/messages' ? 3 : 2} />
+            </Link>
+
+            <Link href="/crews" className={`hidden sm:block p-3 rounded-full transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-900 active:scale-90 ${pathname === '/crews' ? 'text-accent' : 'text-gray-500'}`}>
+                <Users size={26} strokeWidth={pathname === '/crews' ? 3 : 2} />
             </Link>
 
             <Link href={`/user/${user.user_metadata?.username || 'me'}`} className={`p-3 rounded-full transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-900 active:scale-90 ${pathname.startsWith('/user/') ? 'text-accent' : 'text-gray-500'}`}>

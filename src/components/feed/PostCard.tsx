@@ -2,7 +2,7 @@
 
 import { formatDistanceToNow } from 'date-fns'
 import { tr } from 'date-fns/locale'
-import { Trash2, Heart, MessageCircle, Repeat2, Share, Bookmark } from 'lucide-react'
+import { Trash2, Heart, MessageCircle, Repeat2, Share, Bookmark, DollarSign } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/utils/supabase/client'
 import { useState, useEffect, useRef } from 'react'
@@ -13,6 +13,8 @@ import SeenIndicator from './SeenIndicator'
 import { fetchMentionSuggestions, MentionUser } from '@/utils/mentions'
 import { VerifiedBadge } from '../common/VerifiedBadge'
 import { MediaCarousel } from './MediaCarousel'
+import { GifPicker } from '@/components/common/GifPicker'
+import { FileImage } from 'lucide-react'
 
 const getYouTubeId = (url: string) => {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/
@@ -53,12 +55,27 @@ export function PostCard({ post }: PostProps) {
     const articleRef = useRef<HTMLElement | null>(null)
     const [viewRecorded, setViewRecorded] = useState(false)
 
-    // Mentions state for comments
     const [showMentions, setShowMentions] = useState(false)
     const [mentionQuery, setMentionQuery] = useState('')
     const [suggestedUsers, setSuggestedUsers] = useState<MentionUser[]>([])
     const [mentionIndex, setMentionIndex] = useState(0)
     const commentInputRef = useRef<HTMLInputElement>(null)
+    const [showCommentGifPicker, setShowCommentGifPicker] = useState(false)
+
+    // Quote Tweet state
+    const [isRetweeting, setIsRetweeting] = useState(false)
+    const [retweetComment, setRetweetComment] = useState('')
+    const [quotedPost, setQuotedPost] = useState<any>(null)
+    const [retweetsCount, setRetweetsCount] = useState(0)
+
+    // Crew state
+    const [activeCrew, setActiveCrew] = useState<any>(null)
+
+    // Bounty state
+    const [bountyTotal, setBountyTotal] = useState(0)
+    const [showBountyModal, setShowBountyModal] = useState(false)
+    const [bountyAmount, setBountyAmount] = useState('100')
+    const [isSendingBounty, setIsSendingBounty] = useState(false)
 
     useEffect(() => {
         // Auto-record view when post is visible on screen
@@ -178,6 +195,17 @@ export function PostCard({ post }: PostProps) {
                 }
             }
 
+            // Fetch active crew
+            const { data: crewMemberData } = await supabase
+                .from('crew_members')
+                .select('crews(*)')
+                .eq('user_id', post.user_id)
+                .single()
+
+            if (crewMemberData && crewMemberData.crews) {
+                setActiveCrew(crewMemberData.crews)
+            }
+
             // Real-time poll updates
             if (post.poll_data) {
                 const channel = supabase
@@ -211,6 +239,34 @@ export function PostCard({ post }: PostProps) {
                 .select('id', { count: 'exact', head: true })
                 .eq('post_id', post.id)
             setCommentCount(totalComments || 0)
+
+            // Get total retweets count
+            const { count: totalRetweets } = await supabase
+                .from('posts')
+                .select('id', { count: 'exact', head: true })
+                .eq('quote_post_id', post.id)
+            setRetweetsCount(totalRetweets || 0)
+
+            // Fetch quoted post if any
+            if ((post as any).quote_post_id) {
+                const { data: qPost } = await supabase
+                    .from('posts')
+                    .select('*, profiles(username, display_name, avatar_url)')
+                    .eq('id', (post as any).quote_post_id)
+                    .single()
+                if (qPost) setQuotedPost(qPost)
+            }
+
+            // Fetch bounties
+            const { data: bountyData } = await supabase
+                .from('bounties')
+                .select('amount')
+                .eq('post_id', post.id)
+
+            if (bountyData) {
+                const total = bountyData.reduce((sum, b) => sum + b.amount, 0)
+                setBountyTotal(total)
+            }
         }
 
         fetchData()
@@ -282,6 +338,15 @@ export function PostCard({ post }: PostProps) {
         try {
             if (isLiking) {
                 await supabase.from('likes').insert({ post_id: post.id, user_id: user.id })
+                // Bildirim gönder (kendi postunu beğenmediyse)
+                if (post.user_id !== user.id) {
+                    await supabase.from('notifications').insert({
+                        user_id: post.user_id,
+                        actor_id: user.id,
+                        type: 'like',
+                        post_id: post.id
+                    })
+                }
             } else {
                 await supabase.from('likes').delete().match({ post_id: post.id, user_id: user.id })
             }
@@ -337,6 +402,17 @@ export function PostCard({ post }: PostProps) {
             setComments(prev => [...prev, data])
             setCommentCount(prev => prev + 1)
 
+            // Bildirim gönder (kendi postuna yorum yapmadıysa)
+            if (post.user_id !== activeUserId) {
+                await supabase.from('notifications').insert({
+                    user_id: post.user_id,
+                    actor_id: activeUserId,
+                    type: 'reply',
+                    post_id: post.id,
+                    comment_id: data.id
+                })
+            }
+
             // Check for @gtatweet mention to trigger auto-reply
             if (commentText.toLowerCase().includes('@gtatweet')) {
                 try {
@@ -363,6 +439,38 @@ export function PostCard({ post }: PostProps) {
             console.error('Error sending comment:', error)
             alert('Yorum gönderilemedi')
             setNewComment(commentText) // Restore comment if error
+        }
+    }
+
+    const handleRetweet = async () => {
+        if (!user || !activeUserId) return
+
+        try {
+            const { error } = await supabase.from('posts').insert({
+                user_id: activeUserId,
+                content: retweetComment.trim(),
+                quote_post_id: post.id
+            })
+
+            if (error) throw error
+
+            setIsRetweeting(false)
+            setRetweetComment('')
+            setRetweetsCount(prev => prev + 1)
+
+            // Bildirim gönder
+            if (post.user_id !== activeUserId) {
+                await supabase.from('notifications').insert({
+                    user_id: post.user_id,
+                    actor_id: activeUserId,
+                    type: 'retweet',
+                    post_id: post.id
+                })
+            }
+            alert('Başarıyla Retweetlendi!')
+        } catch (error) {
+            console.error('Retweet error:', error)
+            alert('Retweet başarısız oldu.')
         }
     }
 
@@ -408,6 +516,78 @@ export function PostCard({ post }: PostProps) {
         }).eq('id', post.id)
     }
 
+    const renderCommentContent = (content: string) => {
+        // AI Meme/Image Tag Parsing
+        const imageMatch = content.match(/\[IMAGE:(.+?)\]/)
+        if (imageMatch) {
+            const textContent = content.replace(imageMatch[0], '').trim()
+            return (
+                <>
+                    {textContent && <p className="text-sm mt-1 text-gray-800 dark:text-gray-200">{textContent}</p>}
+                    <img src={imageMatch[1]} alt="Attached Media" className="mt-2 rounded-xl max-h-48 object-contain border border-gray-100 dark:border-gray-800" />
+                </>
+            )
+        }
+
+        const lines = content.split('\n')
+        const lastLine = lines[lines.length - 1]?.trim()
+
+        // Simple regex to check if the last line is a media URL (e.g. from our GifPicker)
+        if (lastLine && lastLine.match(/^https:\/\/media\.giphy\.com\/media\/.*\/giphy\.gif$/)) {
+            const textContent = lines.slice(0, -1).join('\n').trim()
+            return (
+                <>
+                    {textContent && <p className="text-sm mt-1 text-gray-800 dark:text-gray-200">{textContent}</p>}
+                    <img src={lastLine} alt="GIF" className="mt-2 rounded-xl max-h-48 object-contain border border-gray-100 dark:border-gray-800" />
+                </>
+            )
+        }
+
+        return <p className="text-sm mt-1 text-gray-800 dark:text-gray-200">{content}</p>
+    }
+
+    const handleSendBounty = async () => {
+        if (!user || user.id === post.user_id) return
+
+        const amount = parseInt(bountyAmount)
+        if (isNaN(amount) || amount <= 0) {
+            alert('Geçerli bir miktar girin.')
+            return
+        }
+
+        setIsSendingBounty(true)
+        try {
+            const { error } = await supabase
+                .from('bounties')
+                .insert({
+                    post_id: post.id,
+                    sender_id: user.id,
+                    receiver_id: post.user_id,
+                    amount: amount
+                })
+
+            if (error) throw error
+
+            setBountyTotal(prev => prev + amount)
+            setShowBountyModal(false)
+
+            // Notify receiver
+            await supabase.from('notifications').insert({
+                user_id: post.user_id,
+                actor_id: user.id,
+                type: 'bounty',
+                post_id: post.id
+            })
+
+            alert(`${amount} G$ ödül gönderildi!`)
+        } catch (error) {
+            console.error('Bounty error:', error)
+            alert('Ödül gönderilemedi.')
+        } finally {
+            setIsSendingBounty(false)
+        }
+    }
+
     return (
         <article ref={(el) => { articleRef.current = el }} className="border-b border-gray-200 dark:border-gray-800 p-3 md:p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors cursor-pointer">
             <div className="flex gap-3 md:gap-4">
@@ -420,6 +600,15 @@ export function PostCard({ post }: PostProps) {
                             <Link href={`/user/${post.profiles.username}`} className="font-bold hover:underline truncate max-w-[120px] md:max-w-none text-[15px] md:text-base flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                 {post.profiles.display_name || post.profiles.username}
                                 <VerifiedBadge size={14} />
+                                {activeCrew && (
+                                    <span
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.location.href = `/crews/${activeCrew.tag}` }}
+                                        className="ml-1 text-xs bg-gray-200 dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300 font-mono hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors"
+                                        title={activeCrew.name}
+                                    >
+                                        [{activeCrew.tag}]
+                                    </span>
+                                )}
                             </Link>
                             {post.profiles.username === 'gtatweet_ai' && (
                                 <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider">
@@ -451,6 +640,33 @@ export function PostCard({ post }: PostProps) {
                         {post.content}
                     </p>
 
+                    {/* Quoted Post Box */}
+                    {quotedPost && (
+                        <div className="mt-3 border border-gray-200 dark:border-gray-700 rounded-2xl p-3 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={(e) => { e.stopPropagation(); window.location.href = `/user/${quotedPost.profiles.username}` }}>
+                            <div className="flex items-center gap-2">
+                                <div className="w-5 h-5 rounded-full bg-cover bg-center" style={{ backgroundImage: `url(${quotedPost.profiles.avatar_url})` }} />
+                                <span className="font-bold text-sm flex items-center gap-1">
+                                    {quotedPost.profiles.display_name}
+                                    <VerifiedBadge size={12} />
+                                </span>
+                                <span className="text-gray-500 text-sm">@{quotedPost.profiles.username}</span>
+                                <span className="text-gray-500 text-xs">· {formatDistanceToNow(new Date(quotedPost.created_at), { locale: tr })}</span>
+                            </div>
+                            <p className="mt-1.5 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+                                {quotedPost.content.substring(0, 150)}{quotedPost.content.length > 150 ? '...' : ''}
+                            </p>
+                            {quotedPost.image_url && !quotedPost.has_multiple_media && (
+                                <img src={quotedPost.image_url} className="mt-2 rounded-xl max-h-32 object-cover w-full opacity-80" alt="Quoted media" />
+                            )}
+                            {quotedPost.media && quotedPost.media.length > 0 && (
+                                <div className="mt-2 text-xs text-blue-500 flex items-center gap-1">
+                                    <MessageCircle size={12} />
+                                    Medya içeriğini görmek için dokunun
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {getYouTubeId(post.content) && (
                         <div className="mt-3 rounded-2xl overflow-hidden aspect-video border border-gray-100 dark:border-gray-800 shadow-sm" onClick={(e) => e.stopPropagation()}>
                             <iframe
@@ -463,14 +679,14 @@ export function PostCard({ post }: PostProps) {
                             ></iframe>
                         </div>
                     )}
-                    
+
                     {/* Display multiple media with carousel */}
                     {(post as any).media && Array.isArray((post as any).media) && (post as any).media.length > 0 && (
-                        <MediaCarousel 
+                        <MediaCarousel
                             mediaItems={(post as any).media}
                         />
                     )}
-                    
+
                     {/* Fallback for old single media format */}
                     {!(post as any).media && (post as any).image_url && (
                         <div className="mt-3" onClick={(e) => e.stopPropagation()}>
@@ -546,9 +762,9 @@ export function PostCard({ post }: PostProps) {
                             <MessageCircle size={18} className="md:w-5 md:h-5" />
                             <span className="text-xs md:text-sm">{commentCount > 0 ? commentCount : ''}</span>
                         </button>
-                        <button className="flex items-center gap-1 group transition-colors p-2 rounded-full hover:bg-green-500/10 hover:text-green-500 active:scale-95" title="Retweet">
+                        <button onClick={() => setIsRetweeting(!isRetweeting)} className={`flex items-center gap-1 group transition-colors p-2 rounded-full hover:bg-green-500/10 hover:text-green-500 active:scale-95 ${isRetweeting ? 'text-green-500' : ''}`} title="Retweet">
                             <Repeat2 size={18} className="md:w-5 md:h-5" />
-                            <span className="text-xs md:text-sm"></span>
+                            <span className="text-xs md:text-sm">{retweetsCount > 0 ? retweetsCount : ''}</span>
                         </button>
                         <button onClick={handleLike} className={`flex items-center gap-1 group transition-colors p-2 rounded-full hover:bg-pink-600/10 active:scale-95 ${liked ? 'text-pink-600' : 'hover:text-pink-600'}`} title="Beğen">
                             <Heart size={18} className="md:w-5 md:h-5" fill={liked ? "currentColor" : "none"} />
@@ -568,6 +784,16 @@ export function PostCard({ post }: PostProps) {
                         >
                             <Bookmark size={18} fill={isBookmarked ? "currentColor" : "none"} />
                         </button>
+                        {!isOwner && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setShowBountyModal(!showBountyModal) }}
+                                className={`flex items-center gap-1 group transition-colors p-2 rounded-full hover:bg-yellow-500/10 hover:text-yellow-600 active:scale-95 ${bountyTotal > 0 ? 'text-yellow-600' : ''}`}
+                                title="Ödül Gönder (Bounty)"
+                            >
+                                <DollarSign size={18} className="md:w-5 md:h-5" />
+                                <span className="text-xs md:text-sm">{bountyTotal > 0 ? bountyTotal : ''}</span>
+                            </button>
+                        )}
                         <GrokButton
                             postId={post.id}
                             content={post.content}
@@ -578,6 +804,49 @@ export function PostCard({ post }: PostProps) {
                             }}
                         />
                     </div>
+
+                    {isRetweeting && (
+                        <div className="mt-3 border border-green-500/30 bg-green-50/50 dark:bg-green-900/10 rounded-2xl p-3" onClick={(e) => e.stopPropagation()}>
+                            <textarea
+                                value={retweetComment}
+                                onChange={(e) => setRetweetComment(e.target.value)}
+                                placeholder="Alıntı ekle veya boş bırak (Direkt RT)"
+                                className="w-full bg-transparent border-none focus:ring-0 text-sm resize-none min-h-[50px] placeholder-gray-500 text-gray-900 dark:text-white outline-none"
+                                maxLength={280}
+                            />
+                            <div className="flex justify-end gap-2 mt-2">
+                                <button onClick={() => setIsRetweeting(false)} className="px-3 py-1.5 rounded-full text-sm font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">İptal</button>
+                                <button onClick={handleRetweet} className="px-4 py-1.5 rounded-full text-sm font-bold bg-green-500 text-white hover:bg-green-600 transition-colors shadow-sm">
+                                    {retweetComment.trim() ? 'Alıntıla (Quote)' : 'Retweet'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {showBountyModal && (
+                        <div className="mt-3 border border-yellow-500/30 bg-yellow-50/50 dark:bg-yellow-900/10 rounded-2xl p-4" onClick={(e) => e.stopPropagation()}>
+                            <h4 className="font-bold text-yellow-800 dark:text-yellow-500 mb-2 flex items-center gap-2">
+                                <DollarSign size={16} /> Gönderiye Ödül Ver
+                            </h4>
+                            <div className="flex gap-2">
+                                <input
+                                    type="number"
+                                    value={bountyAmount}
+                                    onChange={(e) => setBountyAmount(e.target.value)}
+                                    placeholder="Miktar (G$)"
+                                    className="flex-1 bg-white dark:bg-black border border-yellow-200 dark:border-yellow-800 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                    min="1"
+                                />
+                                <button
+                                    onClick={handleSendBounty}
+                                    disabled={isSendingBounty}
+                                    className="px-4 py-2 rounded-xl text-sm font-bold bg-yellow-500 text-white hover:bg-yellow-600 transition-colors shadow-sm disabled:opacity-50"
+                                >
+                                    {isSendingBounty ? 'Gönderiliyor...' : 'Gönder'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     {showComments && (
                         <div className="mt-4 border-t border-gray-100 dark:border-gray-800 pt-4" onClick={(e) => e.stopPropagation()}>
@@ -623,7 +892,7 @@ export function PostCard({ post }: PostProps) {
                                                         </button>
                                                     )}
                                                 </div>
-                                                <p className="text-sm mt-1 text-gray-800 dark:text-gray-200">{comment.content}</p>
+                                                {renderCommentContent(comment.content)}
                                             </div>
                                         </div>
                                     ))
@@ -651,10 +920,35 @@ export function PostCard({ post }: PostProps) {
                                             />
                                         </div>
                                     )}
+                                    <div className="relative">
+                                        <button
+                                            onClick={() => setShowCommentGifPicker(!showCommentGifPicker)}
+                                            className="p-2 text-gray-500 hover:text-accent transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+                                            title="GIF Ekle"
+                                        >
+                                            <FileImage size={20} />
+                                        </button>
+                                        {showCommentGifPicker && (
+                                            <div className="absolute bottom-full right-0 mb-2 z-50">
+                                                <GifPicker
+                                                    onClose={() => setShowCommentGifPicker(false)}
+                                                    onSelect={async (url) => {
+                                                        const commentText = newComment.trim() ? `${newComment}\n${url}` : url
+                                                        setNewComment(commentText)
+                                                        setShowCommentGifPicker(false)
+                                                        // Automatically send if it's just a GIF
+                                                        if (!newComment.trim()) {
+                                                            setTimeout(() => handleSendComment(), 50)
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
                                     <button
                                         onClick={handleSendComment}
                                         disabled={!newComment.trim()}
-                                        className="text-blue-500 disabled:opacity-50 font-bold text-sm"
+                                        className="text-blue-500 disabled:opacity-50 font-bold text-sm px-2"
                                     >
                                         Gönder
                                     </button>
